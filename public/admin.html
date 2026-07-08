@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="id" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ORCA — Master Control</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- SheetJS for Excel Parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #000000; /* OLED Black */
+            color: #ededed;
+        }
+        h1, h2, h3, h4, h5, h6, .navbar-brand {
+            font-family: 'Outfit', sans-serif !important;
+            letter-spacing: -0.02em;
+        }
+        .card { 
+            border: 1px solid #1f1f1f !important;
+            background-color: #0a0a0a !important; 
+            border-radius: 12px !important;
+            box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.5) !important;
+        }
+        .card-header {
+            border-bottom: 1px solid #1f1f1f !important;
+            background-color: transparent !important;
+        }
+        .navbar { 
+            border-bottom: 1px solid #1f1f1f !important; 
+            background-color: rgba(0, 0, 0, 0.8) !important;
+            backdrop-filter: blur(12px);
+        }
+        .btn-primary {
+            background-color: #ededed !important;
+            color: #000000 !important;
+            border: 1px solid #ffffff !important;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            background-color: #d4d4d4 !important;
+            transform: translateY(-1px);
+        }
+        .btn-outline-danger {
+            border-radius: 8px;
+        }
+        .table-dark { 
+            --bs-table-bg: transparent; 
+            --bs-table-hover-bg: rgba(255, 255, 255, 0.05);
+        }
+        .table-bordered { border-color: #1f1f1f; }
+        .table-active th { background-color: #050505 !important; border-bottom: 1px solid #333 !important;}
+        .form-control {
+            background-color: #000000 !important;
+            border: 1px solid #333 !important;
+            color: #ededed !important;
+            border-radius: 6px;
+        }
+        .form-control:focus {
+            border-color: #666 !important;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1) !important;
+        }
+        .text-secondary { color: #a1a1aa !important; }
+        .border-secondary { border-color: #1f1f1f !important; }
+        .bg-dark { background-color: #0a0a0a !important; }
+        
+        .upload-area {
+            border: 2px dashed #333;
+            background-color: #050505;
+            border-radius: 12px;
+            transition: all 0.2s ease;
+        }
+        .upload-area:hover {
+            border-color: #ededed;
+            background-color: rgba(255,255,255,0.02);
+        }
+    </style>
+</head>
+<body class="d-flex flex-column vh-100">
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-2 px-4 shadow-sm">
+        <div class="container-fluid px-0">
+            <a class="navbar-brand d-flex align-items-center gap-2 fs-6 fw-semibold" href="index.html">
+                <i data-lucide="shield-check" class="icon-md"></i> ORCA <span class="text-secondary fw-normal px-2">|</span> Master Control
+            </a>
+            
+            <div class="ms-auto d-flex align-items-center gap-3">
+                <span class="text-secondary small">Logged in as <strong class="text-white" id="nav-user">...</strong></span>
+                <button id="btn-logout" class="btn btn-outline-secondary btn-sm">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid flex-grow-1 p-4 overflow-auto">
+        <div class="d-flex flex-column gap-4 h-100 max-w-100 mx-auto" style="max-width: 1200px;">
+            
+            <!-- Upload Card -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-transparent border-secondary py-3 d-flex align-items-center gap-2">
+                    <i data-lucide="upload-cloud" class="icon-md text-secondary"></i>
+                    <h6 class="mb-0 fw-semibold">Upload Schedule (Excel)</h6>
+                </div>
+                <div class="card-body">
+                    <div class="upload-area mb-3" id="upload-area" onclick="document.getElementById('excel-file').click()">
+                        <i data-lucide="file-spreadsheet" class="text-secondary mb-3" style="width: 48px; height: 48px;"></i>
+                        <h5>Click or drag Excel file (.xlsx) here to upload</h5>
+                        <p class="text-secondary small mt-2">Expected columns: Studio, Host, Brand, Location, LS Time (or Start Time/End Time)</p>
+                        <input type="file" id="excel-file" accept=".xlsx, .xls, .csv" class="d-none">
+                    </div>
+                    
+                    <div class="d-flex justify-content-end gap-2">
+                        <button id="btn-clear-schedule" class="btn btn-outline-danger btn-sm d-none d-flex align-items-center gap-2">
+                            <i data-lucide="trash-2" class="icon-sm"></i> Clear Database
+                        </button>
+                        <button id="btn-save-schedule" class="btn btn-primary btn-sm d-none d-flex align-items-center gap-2">
+                            <i data-lucide="save" class="icon-sm"></i> Save Changes to Database
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Card -->
+            <div class="card shadow-sm flex-grow-1 min-h-0">
+                <div class="card-header bg-transparent border-secondary py-3 d-flex align-items-center gap-2">
+                    <i data-lucide="table" class="icon-md text-secondary"></i>
+                    <h6 class="mb-0 fw-semibold">Current Schedule Database</h6>
+                </div>
+                <div class="card-body p-0 overflow-auto">
+                    <table class="table table-dark table-hover table-bordered mb-0 align-middle text-nowrap" id="schedule-table">
+                        <thead class="table-active">
+                            <tr>
+                                <th class="fw-medium text-secondary">Studio</th>
+                                <th class="fw-medium text-secondary">Host Name</th>
+                                <th class="fw-medium text-secondary">Brand</th>
+                                <th class="fw-medium text-secondary">Location</th>
+                                <th class="fw-medium text-secondary">Start Time</th>
+                                <th class="fw-medium text-secondary">End Time</th>
+                                <th class="fw-medium text-secondary text-center" style="width: 60px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schedule-body">
+                            <tr><td colspan="7" class="text-center text-secondary py-4">No schedule loaded. Upload an Excel file.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>lucide.createIcons();</script>
+    <script type="module" src="assets/js/admin.js"></script>
+    <script>
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            sessionStorage.removeItem('orca_auth');
+            window.location.href = 'login.html';
+        });
+    </script>
+</body>
+</html>

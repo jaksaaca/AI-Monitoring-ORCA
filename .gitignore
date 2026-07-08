@@ -1,0 +1,50 @@
+# ==================================
+# ORCA Host Monitoring — Web App
+# ==================================
+
+# Dependencies
+node_modules/
+.npm
+.cache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel Deployment
+.vercel/
+
+# Firebase Deployment
+.firebase/
+firebase-export-*/
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# IDE / Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build / Output directories
+dist/
+build/
+out/
+
+# Logs
+logs
+*.log
