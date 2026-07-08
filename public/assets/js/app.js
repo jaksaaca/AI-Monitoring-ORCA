@@ -14,7 +14,7 @@ import * as VAD from './modules/vad.js';
 import * as Session from './modules/session.js';
 import { drawOverlay } from './modules/canvas-overlay.js';
 import { playSoftWarning } from './modules/audio-warning.js';
-import { listenToSchedule, saveSessionLog } from './modules/firebase-db.js';
+import { listenToSchedule, saveSessionLog, subscribeToStudioStatus, setStudioStatus } from './modules/firebase-db.js';
 
 // Branch Selection
 let currentBranch = sessionStorage.getItem('orca_branch');
@@ -137,7 +137,16 @@ async function initialize() {
         // Listen to schedule from Firebase Cloud
         listenToSchedule((data) => {
             scheduleDb = data;
-            if (currentBranch) populateStudios();
+            if (currentBranch) {
+                populateStudios();
+                
+                // Also listen to studio statuses for anti-overlap
+                if (unsubscribeStudioStatus) unsubscribeStudioStatus();
+                unsubscribeStudioStatus = subscribeToStudioStatus(currentBranch, (statuses) => {
+                    currentStudioStatuses = statuses;
+                    updateStudioDropdown();
+                });
+            }
         });
 
         // Wait a moment then show app
@@ -362,6 +371,9 @@ function formatDuration(totalSeconds) {
 let activeSchedule = null;
 let scheduleDb = [];
 
+let currentStudioStatuses = {};
+let unsubscribeStudioStatus = null;
+
 const studioSelect = document.getElementById('studio');
 const infoHost = document.getElementById('info-host');
 const infoBrand = document.getElementById('info-brand');
@@ -382,6 +394,7 @@ function populateStudios() {
             opt.textContent = studio;
             studioSelect.appendChild(opt);
         });
+        updateStudioDropdown();
     } else {
         studioSelect.innerHTML = '<option value="" disabled selected>No Schedule Uploaded for ' + currentBranch + '</option>';
         infoHost.textContent = "-";
@@ -454,13 +467,20 @@ studioSelect.addEventListener('change', () => {
 // ============================================
 
 // Start Session
-btnStart.addEventListener('click', () => {
+btnStart.addEventListener('click', async () => {
     if (!studioSelect.value) {
         alert("Please select a Studio first.");
         return;
     }
     if (!activeSchedule) {
         alert("No valid schedule found for this studio. Please check Master Control.");
+        return;
+    }
+
+    const studioName = activeSchedule.studio;
+    const statusData = currentStudioStatuses[studioName];
+    if (statusData && statusData.status === 'active') {
+        alert(`ACCESS DENIED: Studio [${studioName}] is currently IN USE by another operator!`);
         return;
     }
 
@@ -472,6 +492,15 @@ btnStart.addEventListener('click', () => {
         start_program: activeSchedule.startTime,
         end_program: activeSchedule.endTime,
     };
+
+    // Claim Studio
+    await setStudioStatus(currentBranch, studioName, {
+        status: 'active',
+        org: activeSchedule.organization || '',
+        brand: activeSchedule.brand || '',
+        host: activeSchedule.hostName || '',
+        operator: sessionStorage.getItem('orca_user') || 'Unknown'
+    });
 
     Session.startSession(meta);
     isSessionActive = true;
@@ -526,6 +555,15 @@ btnStop.addEventListener('click', async () => {
     } catch (e) {
         alert("Warning: Could not save session log to cloud.\nError: " + e.message);
     }
+
+    // Release Studio
+    await setStudioStatus(currentBranch, activeSchedule.studio, {
+        status: 'idle',
+        org: '',
+        brand: '',
+        host: '',
+        operator: ''
+    });
 
     // Unlock form
     btnStart.disabled = false;
@@ -583,9 +621,28 @@ window.addEventListener('beforeunload', (e) => {
 window.addEventListener('unload', () => {
     if (isSessionActive) {
         const { metadata, stats } = Session.stopSession();
+        // Release studio
+        setStudioStatus(currentBranch, activeSchedule.studio, { status: 'idle' });
         CSVExport.appendToMasterLog(metadata, stats);
     }
 });
+
+// Update Studio Dropdown Disabled States
+function updateStudioDropdown() {
+    if (isSessionActive) return; // Don't mess with it while active
+    
+    Array.from(studioSelect.options).forEach(opt => {
+        if (!opt.value) return; // skip placeholder
+        const statusData = currentStudioStatuses[opt.value];
+        if (statusData && statusData.status === 'active') {
+            opt.disabled = true;
+            opt.textContent = `${opt.value} (IN USE)`;
+        } else {
+            opt.disabled = false;
+            opt.textContent = opt.value;
+        }
+    });
+}
 
 // ============================================
 // START THE APPLICATION

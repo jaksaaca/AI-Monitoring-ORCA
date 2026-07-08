@@ -6,7 +6,7 @@
  * ================================================
  */
 
-import { uploadSchedule, getSchedule } from "./modules/firebase-db.js";
+import { uploadSchedule, getSchedule, subscribeToStudioStatus } from "./modules/firebase-db.js";
 
 // Check Auth
 const authData = JSON.parse(sessionStorage.getItem('orca_auth'));
@@ -187,3 +187,98 @@ btnClear.addEventListener('click', async () => {
         }
     }
 });
+
+// ==========================================
+// COMMAND CENTER LOGIC
+// ==========================================
+const ccBranch = document.getElementById('cc-branch');
+const ccGrid = document.getElementById('command-center-grid');
+
+let unsubscribeStatus = null;
+let currentStatuses = {};
+let uptimeInterval = null;
+
+function initCommandCenter() {
+    if (!ccBranch || !ccGrid) return;
+    
+    ccBranch.addEventListener('change', listenToStatus);
+    listenToStatus();
+    
+    // Start uptime ticking
+    if (uptimeInterval) clearInterval(uptimeInterval);
+    uptimeInterval = setInterval(updateUptimes, 1000);
+}
+
+function listenToStatus() {
+    if (unsubscribeStatus) unsubscribeStatus();
+    
+    unsubscribeStatus = subscribeToStudioStatus(ccBranch.value, (statuses) => {
+        currentStatuses = statuses;
+        renderGrid();
+    });
+}
+
+function renderGrid() {
+    const branch = ccBranch.value;
+    const numStudios = branch === 'Bandung' ? 30 : 11;
+    
+    ccGrid.innerHTML = '';
+    
+    for (let i = 1; i <= numStudios; i++) {
+        const suffix = branch === 'Bandung' ? 'BDG' : 'JKT';
+        const studioName = `Studio ${i} ${suffix}`;
+        const statusData = currentStatuses[studioName] || { status: 'idle' };
+        const isActive = statusData.status === 'active';
+        
+        const cardCol = document.createElement('div');
+        cardCol.className = 'col-xl-2 col-lg-3 col-md-4 col-sm-6';
+        
+        cardCol.innerHTML = `
+            <div class="card h-100 ${isActive ? 'border-info' : 'border-secondary'}" style="${isActive ? 'box-shadow: 0 0 20px rgba(13, 202, 240, 0.15); border-width: 2px !important;' : ''}">
+                <div class="card-body p-3 d-flex flex-column gap-2">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <span class="badge ${isActive ? 'bg-info text-dark' : 'bg-secondary text-white'}">${String(i).padStart(2, '0')} ${isActive && statusData.org ? statusData.org : ''}</span>
+                        <span class="small font-monospace fw-bold ${isActive ? 'text-info' : 'text-secondary'}">${isActive ? 'ACTIVE' : 'IDLE'}</span>
+                    </div>
+                    <div class="mt-3">
+                        <h6 class="mb-0 text-white fw-bold brand-font" style="letter-spacing: 1px;">${isActive ? (statusData.brand || '-') : '-'}</h6>
+                        <small class="text-secondary">${isActive ? (statusData.host || '-') : '-'}</small>
+                    </div>
+                    <div class="mt-auto pt-3 d-flex justify-content-between align-items-center border-top border-secondary mt-3">
+                        <small class="text-secondary d-flex align-items-center gap-1">
+                            <i data-lucide="user" style="width: 14px"></i> ${isActive ? (statusData.operator || '-') : '-'}
+                        </small>
+                        <small class="text-info font-monospace fw-bold uptime-clock" data-time="${isActive ? statusData.updatedAt : ''}">
+                            ${isActive ? '00:00:00' : '--:--'}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        `;
+        ccGrid.appendChild(cardCol);
+    }
+    
+    if (window.lucide) {
+        lucide.createIcons({ root: ccGrid });
+    }
+    updateUptimes();
+}
+
+function updateUptimes() {
+    const clocks = document.querySelectorAll('.uptime-clock');
+    const now = new Date().getTime();
+    
+    clocks.forEach(clock => {
+        const startTime = parseInt(clock.getAttribute('data-time'));
+        if (!startTime) return;
+        
+        const diff = Math.max(0, Math.floor((now - startTime) / 1000));
+        const h = String(Math.floor(diff / 3600)).padStart(2, '0');
+        const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+        const s = String(diff % 60).padStart(2, '0');
+        clock.textContent = `${h}:${m}:${s}`;
+    });
+}
+
+// Start CC
+document.addEventListener('DOMContentLoaded', initCommandCenter);

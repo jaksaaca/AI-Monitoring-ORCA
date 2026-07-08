@@ -54,10 +54,47 @@
 
     <!-- Main Content -->
     <div class="container-fluid flex-grow-1 p-4 overflow-auto">
-        <div class="d-flex flex-column gap-4 h-100 max-w-100 mx-auto" style="max-width: 1200px;">
+        <div class="d-flex flex-column gap-4 h-100 max-w-100 mx-auto" style="max-width: 1400px;">
             
-            <!-- Upload Card -->
-            <div class="card shadow-sm">
+            <!-- Tabs Nav -->
+            <ul class="nav nav-tabs mb-2" id="adminTabs" role="tablist" style="border-bottom-color: var(--theme-border);">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active d-flex align-items-center gap-2" id="cc-tab" data-bs-toggle="tab" data-bs-target="#tab-cc" type="button" role="tab" style="color: var(--theme-text);">
+                        <i data-lucide="monitor" style="width: 18px;"></i> Command Center
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link d-flex align-items-center gap-2" id="upload-tab" data-bs-toggle="tab" data-bs-target="#tab-upload" type="button" role="tab" style="color: var(--theme-text-muted);">
+                        <i data-lucide="upload-cloud" style="width: 18px;"></i> Master Schedule
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content flex-grow-1" id="adminTabsContent">
+                
+                <!-- TAB 1: COMMAND CENTER -->
+                <div class="tab-pane fade show active h-100" id="tab-cc" role="tabpanel" tabindex="0">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="mb-0 text-white brand-font" style="letter-spacing: 2px;">ORBIZ_COMMAND_CENTER</h4>
+                        <div class="d-flex gap-3">
+                            <select id="cc-branch" class="form-select form-select-sm bg-dark text-white border-secondary" style="width: 150px;">
+                                <option value="Jakarta">Jakarta</option>
+                                <option value="Bandung">Bandung</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Command Center Grid -->
+                    <div class="row g-3" id="command-center-grid">
+                        <!-- Populated by admin.js -->
+                    </div>
+                </div>
+
+                <!-- TAB 2: UPLOAD SCHEDULE -->
+                <div class="tab-pane fade" id="tab-upload" role="tabpanel" tabindex="0">
+                    
+                    <!-- Upload Card -->
+                    <div class="card shadow-sm">
                 <div class="card-header bg-transparent border-secondary py-3 d-flex align-items-center gap-2">
                     <i data-lucide="upload-cloud" class="icon-md text-secondary"></i>
                     <h6 class="mb-0 fw-semibold">Upload Schedule (Excel)</h6>
@@ -127,8 +164,15 @@
                 </div>
             </div>
 
+                </div> <!-- End tab-upload -->
+            </div> <!-- End tab-content -->
         </div>
     </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-3 mt-auto" style="border-top: 1px solid var(--theme-border); background-color: var(--theme-bg);">
+        <small class="text-secondary">&copy; 2026 ORCA Operator. Developed by Jaksa Setia Alam</small>
+    </footer>
 
     <!-- Bootstrap Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

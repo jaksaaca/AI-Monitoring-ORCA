@@ -141,3 +141,39 @@ export async function getAllSessionLogs() {
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
+
+// ==========================================
+// 4. COMMAND CENTER (STUDIO STATUS)
+// ==========================================
+
+export function subscribeToStudioStatus(branch, callback) {
+    const q = query(
+        collection(db, "studio_status"), 
+        where("branch", "==", branch)
+    );
+    
+    return onSnapshot(q, (snapshot) => {
+        const statuses = {};
+        snapshot.forEach(doc => {
+            statuses[doc.data().studio] = doc.data();
+        });
+        callback(statuses);
+    });
+}
+
+export async function setStudioStatus(branch, studio, statusData) {
+    try {
+        const docId = `${branch}_${studio}`.replace(/\s+/g, '_');
+        const docRef = doc(db, "studio_status", docId);
+        await setDoc(docRef, {
+            branch,
+            studio,
+            ...statusData,
+            updatedAt: new Date().getTime()
+        }, { merge: true });
+        return true;
+    } catch (e) {
+        console.error("Error setting studio status:", e);
+        return false;
+    }
+}
