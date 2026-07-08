@@ -17,72 +17,22 @@
     <style>
         body { 
             font-family: 'Inter', sans-serif; 
-            background-color: #000000; /* OLED Black */
-            color: #ededed;
         }
         h1, h2, h3, h4, h5, h6, .navbar-brand {
             font-family: 'Outfit', sans-serif !important;
             letter-spacing: -0.02em;
         }
-        .card { 
-            border: 1px solid #1f1f1f !important;
-            background-color: #0a0a0a !important; 
-            border-radius: 12px !important;
-            box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.5) !important;
-        }
-        .card-header {
-            border-bottom: 1px solid #1f1f1f !important;
-            background-color: transparent !important;
-        }
-        .navbar { 
-            border-bottom: 1px solid #1f1f1f !important; 
-            background-color: rgba(0, 0, 0, 0.8) !important;
-            backdrop-filter: blur(12px);
-        }
-        .btn-primary {
-            background-color: #ededed !important;
-            color: #000000 !important;
-            border: 1px solid #ffffff !important;
-            font-weight: 500;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-        }
-        .btn-primary:hover {
-            background-color: #d4d4d4 !important;
-            transform: translateY(-1px);
-        }
-        .btn-outline-danger {
-            border-radius: 8px;
-        }
-        .table-dark { 
-            --bs-table-bg: transparent; 
-            --bs-table-hover-bg: rgba(255, 255, 255, 0.05);
-        }
-        .table-bordered { border-color: #1f1f1f; }
-        .table-active th { background-color: #050505 !important; border-bottom: 1px solid #333 !important;}
-        .form-control {
-            background-color: #000000 !important;
-            border: 1px solid #333 !important;
-            color: #ededed !important;
-            border-radius: 6px;
-        }
-        .form-control:focus {
-            border-color: #666 !important;
-            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1) !important;
-        }
-        .text-secondary { color: #a1a1aa !important; }
-        .border-secondary { border-color: #1f1f1f !important; }
-        .bg-dark { background-color: #0a0a0a !important; }
-        
         .upload-area {
-            border: 2px dashed #333;
-            background-color: #050505;
+            border: 2px dashed var(--theme-border);
+            background-color: rgba(0, 0, 0, 0.2);
             border-radius: 12px;
             transition: all 0.2s ease;
+            color: var(--theme-text-muted);
         }
         .upload-area:hover {
-            border-color: #ededed;
-            background-color: rgba(255,255,255,0.02);
+            border-color: var(--theme-primary);
+            background-color: rgba(59, 130, 246, 0.05);
+            color: var(--theme-text);
         }
     </style>
 </head>
@@ -91,7 +41,7 @@
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-2 px-4 shadow-sm">
         <div class="container-fluid px-0">
-            <a class="navbar-brand d-flex align-items-center gap-2 fs-6 fw-semibold" href="index.html">
+            <a class="navbar-brand d-flex align-items-center gap-2 fs-6 fw-semibold text-white" href="index.html">
                 <i data-lucide="shield-check" class="icon-md"></i> ORCA <span class="text-secondary fw-normal px-2">|</span> Master Control
             </a>
             
@@ -113,10 +63,29 @@
                     <h6 class="mb-0 fw-semibold">Upload Schedule (Excel)</h6>
                 </div>
                 <div class="card-body">
+                    <!-- Target Selectors -->
+                    <div class="row g-2 mb-3 p-3 rounded" style="background-color: rgba(0,0,0,0.2); border: 1px solid var(--theme-border);">
+                        <div class="col-md-6">
+                            <label class="form-label small text-secondary mb-1">Target Branch</label>
+                            <select id="admin-branch" class="form-select form-select-sm">
+                                <option value="Jakarta">Jakarta</option>
+                                <option value="Bandung">Bandung</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-secondary mb-1">Target Organization</label>
+                            <select id="admin-organization" class="form-select form-select-sm">
+                                <option value="ORCA">ORCA</option>
+                                <option value="Reckitt">Reckitt</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Upload Area -->
                     <div class="upload-area mb-3" id="upload-area" onclick="document.getElementById('excel-file').click()">
                         <i data-lucide="file-spreadsheet" class="text-secondary mb-3" style="width: 48px; height: 48px;"></i>
                         <h5>Click or drag Excel file (.xlsx) here to upload</h5>
-                        <p class="text-secondary small mt-2">Expected columns: Studio, Host, Brand, Location, LS Time (or Start Time/End Time)</p>
+                        <p class="text-secondary small mt-2">Expected columns: Studio, Host, Brand, Platform, Location, LS Time (or Start Time/End Time)</p>
                         <input type="file" id="excel-file" accept=".xlsx, .xls, .csv" class="d-none">
                     </div>
                     
@@ -144,6 +113,7 @@
                                 <th class="fw-medium text-secondary">Studio</th>
                                 <th class="fw-medium text-secondary">Host Name</th>
                                 <th class="fw-medium text-secondary">Brand</th>
+                                <th class="fw-medium text-secondary">Platform</th>
                                 <th class="fw-medium text-secondary">Location</th>
                                 <th class="fw-medium text-secondary">Start Time</th>
                                 <th class="fw-medium text-secondary">End Time</th>

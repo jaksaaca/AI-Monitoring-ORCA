@@ -15,13 +15,12 @@ import {
 // ⚠️ FIREBASE CONFIGURATION (USER MUST FILL)
 // ==========================================
 const firebaseConfig = {
-    // PASTE YOUR FIREBASE CONFIG HERE
-    // apiKey: "...",
-    // authDomain: "...",
-    // projectId: "...",
-    // storageBucket: "...",
-    // messagingSenderId: "...",
-    // appId: "..."
+  apiKey: "AIzaSyChiTYLxjlWJ_fWn3JxYvggu-GZYiIBVgs",
+  authDomain: "ai-monitoring-orca-8cfb3.firebaseapp.com",
+  projectId: "ai-monitoring-orca-8cfb3",
+  storageBucket: "ai-monitoring-orca-8cfb3.firebasestorage.app",
+  messagingSenderId: "330499608796",
+  appId: "1:330499608796:web:a5df10b3ee41705e5de419"
 };
 
 if (!firebaseConfig.apiKey) {
@@ -86,21 +85,35 @@ export async function deleteUser(userId) {
 // 2. SCHEDULE MANAGEMENT
 // ==========================================
 
-export async function uploadSchedule(scheduleArray) {
-    // Clear existing schedule (Optional: delete all docs in collection)
-    const snapshot = await getDocs(collection(db, "schedules"));
+export async function uploadSchedule(scheduleArray, branch, organization) {
+    if (!branch || !organization) throw new Error("Branch and Organization are required to upload schedule.");
+
+    // Clear existing schedule ONLY for this branch and organization
+    const q = query(collection(db, "schedules"), 
+                    where("branch", "==", branch), 
+                    where("organization", "==", organization));
+    const snapshot = await getDocs(q);
     const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
     await Promise.all(deletePromises);
     
     // Add new ones
     const addPromises = scheduleArray.map(sched => {
+        sched.branch = branch;
+        sched.organization = organization;
         return addDoc(collection(db, "schedules"), sched);
     });
     await Promise.all(addPromises);
 }
 
-export async function getSchedule() {
-    const snapshot = await getDocs(collection(db, "schedules"));
+export async function getSchedule(branch = null, organization = null) {
+    let q = collection(db, "schedules");
+    if (branch) {
+        q = query(q, where("branch", "==", branch));
+    }
+    if (organization) {
+        q = query(q, where("organization", "==", organization));
+    }
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 

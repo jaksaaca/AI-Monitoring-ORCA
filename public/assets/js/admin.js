@@ -19,23 +19,34 @@ const fileInput = document.getElementById('excel-file');
 const tbody = document.getElementById('schedule-body');
 const btnSave = document.getElementById('btn-save-schedule');
 const btnClear = document.getElementById('btn-clear-schedule');
+const adminBranch = document.getElementById('admin-branch');
+const adminOrganization = document.getElementById('admin-organization');
 
 // Internal state
 let scheduleData = [];
 
 // Load existing from Firebase
-window.addEventListener('DOMContentLoaded', async () => {
+async function loadSchedule() {
     try {
-        scheduleData = await getSchedule();
+        const branch = adminBranch.value;
+        const organization = adminOrganization.value;
+        scheduleData = await getSchedule(branch, organization);
+        renderTable();
         if (scheduleData.length > 0) {
-            renderTable();
             btnSave.classList.remove('d-none');
             btnClear.classList.remove('d-none');
+        } else {
+            btnSave.classList.add('d-none');
+            btnClear.classList.add('d-none');
         }
     } catch (e) {
         console.warn("Could not load from Firebase:", e);
     }
-});
+}
+
+window.addEventListener('DOMContentLoaded', loadSchedule);
+adminBranch.addEventListener('change', loadSchedule);
+adminOrganization.addEventListener('change', loadSchedule);
 
 // File Upload Handler
 fileInput.addEventListener('change', async (e) => {
@@ -66,6 +77,7 @@ fileInput.addEventListener('change', async (e) => {
             studio: String(row['Studio'] || row['studio'] || '').trim(),
             hostName: String(row['Host'] || row['Host Name'] || row['Nama Host'] || '').trim(),
             brand: String(row['Brand'] || row['brand'] || '').trim(),
+            platform: String(row['Platform'] || row['Platform Live'] || row['Streaming'] || '').trim(),
             location: String(row['Location'] || row['Lokasi'] || '').trim(),
             startTime: startTime,
             endTime: endTime
@@ -94,6 +106,7 @@ function renderTable() {
             <td><input type="text" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.studio}" data-idx="${index}" data-field="studio"></td>
             <td><input type="text" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.hostName}" data-idx="${index}" data-field="hostName"></td>
             <td><input type="text" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.brand}" data-idx="${index}" data-field="brand"></td>
+            <td><input type="text" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.platform || ''}" data-idx="${index}" data-field="platform"></td>
             <td><input type="text" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.location}" data-idx="${index}" data-field="location"></td>
             <td><input type="time" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.startTime}" data-idx="${index}" data-field="startTime"></td>
             <td><input type="time" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.endTime}" data-idx="${index}" data-field="endTime"></td>
@@ -133,13 +146,15 @@ btnSave.addEventListener('click', async () => {
         return;
     }
     
+    const branch = adminBranch.value;
+    const organization = adminOrganization.value;
     btnSave.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
     btnSave.disabled = true;
 
     try {
-        await uploadSchedule(scheduleData);
+        await uploadSchedule(scheduleData, branch, organization);
         
-        btnSave.innerHTML = '<i data-lucide="check"></i> Saved to Cloud!';
+        btnSave.innerHTML = `<i data-lucide="check"></i> Saved ${branch} (${organization}) to Cloud!`;
         btnSave.classList.replace('btn-primary', 'btn-success');
         lucide.createIcons();
         
@@ -158,9 +173,11 @@ btnSave.addEventListener('click', async () => {
 
 // Clear Database
 btnClear.addEventListener('click', async () => {
-    if (confirm('Are you sure you want to clear the entire schedule database from the cloud?')) {
+    const branch = adminBranch.value;
+    const organization = adminOrganization.value;
+    if (confirm(`Are you sure you want to clear the entire schedule for ${branch} (${organization}) from the cloud?`)) {
         try {
-            await uploadSchedule([]); // empty array to clear
+            await uploadSchedule([], branch, organization); // empty array to clear
             scheduleData = [];
             renderTable();
             btnSave.classList.add('d-none');

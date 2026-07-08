@@ -16,8 +16,11 @@ document.getElementById('btn-logout').addEventListener('click', () => {
 // ANALYTICS & EXPORT TAB
 // ==========================================
 const tbodyLogs = document.getElementById('logs-tbody');
+const fBranch = document.getElementById('filter-branch');
+const fOrganization = document.getElementById('filter-organization');
 const fStudio = document.getElementById('filter-studio');
 const fBrand = document.getElementById('filter-brand');
+const fPlatform = document.getElementById('filter-platform');
 const fHost = document.getElementById('filter-host');
 const matchCount = document.getElementById('match-count');
 const btnDownload = document.getElementById('btn-download');
@@ -38,6 +41,7 @@ async function loadAnalytics() {
 function populateFilters() {
     const studios = [...new Set(allLogs.map(l => l.studio_id).filter(Boolean))].sort();
     const brands = [...new Set(allLogs.map(l => l.brand).filter(Boolean))].sort();
+    const platforms = [...new Set(allLogs.map(l => l.platform).filter(Boolean))].sort();
     const hosts = [...new Set(allLogs.map(l => l.host_name).filter(Boolean))].sort();
 
     const createOpts = (arr, el) => {
@@ -53,18 +57,26 @@ function populateFilters() {
 
     createOpts(studios, fStudio);
     createOpts(brands, fBrand);
+    createOpts(platforms, fPlatform);
     createOpts(hosts, fHost);
 }
 
 function renderLogs() {
+    const br = fBranch ? fBranch.value : 'all';
+    const org = fOrganization ? fOrganization.value : 'all';
     const s = fStudio.value;
     const b = fBrand.value;
+    const p = fPlatform.value;
     const h = fHost.value;
 
     filteredLogs = allLogs.filter(l => {
-        return (s === 'all' || l.studio_id === s) &&
-               (b === 'all' || l.brand === b) &&
-               (h === 'all' || l.host_name === h);
+        const mBranch = br === 'all' || (l.branch || '').toLowerCase() === br.toLowerCase();
+        const mOrg = org === 'all' || (l.organization || '').toLowerCase() === org.toLowerCase();
+        const mStudio = s === 'all' || l.studio_id === s;
+        const mBrand = b === 'all' || l.brand === b;
+        const mPlatform = p === 'all' || l.platform === p;
+        const mHost = h === 'all' || l.host_name === h;
+        return mBranch && mOrg && mStudio && mBrand && mPlatform && mHost;
     });
 
     matchCount.textContent = filteredLogs.length;
@@ -76,9 +88,12 @@ function renderLogs() {
 
     tbodyLogs.innerHTML = filteredLogs.map(l => `
         <tr>
-            <td class="ps-4">${l.timestamp ? new Date(l.timestamp).toLocaleString() : l['date & day']}</td>
-            <td><span class="badge bg-dark">${l.studio_id || '-'}</span></td>
+            <td class="ps-4">${l.timestamp ? new Date(l.timestamp).toLocaleString() : l['dateDay'] || '-'}</td>
+            <td><span class="badge bg-secondary">${l.branch || '-'}</span></td>
+            <td><span class="badge bg-info text-dark">${l.organization || '-'}</span></td>
+            <td><span class="badge bg-light text-dark border">${l.studio_id || '-'}</span></td>
             <td>${l.brand || '-'}</td>
+            <td><span class="badge bg-primary">${l.platform || '-'}</span></td>
             <td>${l.host_name || '-'}</td>
             <td>${l.total_duration_seconds}s</td>
             <td class="${l.face_detected_pct < 50 ? 'text-danger' : 'text-success'}">${l.face_detected_pct}%</td>
@@ -87,7 +102,9 @@ function renderLogs() {
     `).join('');
 }
 
-[fStudio, fBrand, fHost].forEach(el => el.addEventListener('change', renderLogs));
+if(fBranch) fBranch.addEventListener('change', renderLogs);
+if(fOrganization) fOrganization.addEventListener('change', renderLogs);
+[fStudio, fBrand, fPlatform, fHost].forEach(el => el.addEventListener('change', renderLogs));
 
 // Export CSV
 btnDownload.addEventListener('click', () => {
@@ -96,17 +113,50 @@ btnDownload.addEventListener('click', () => {
         return;
     }
     
-    // We expect log headers
-    const headers = Object.keys(filteredLogs[0]).filter(k => k !== 'id'); // remove firestore id
-    const rows = filteredLogs.map(row =>
-        headers.map(h => {
-            const val = row[h] !== undefined ? String(row[h]) : '';
-            if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-                return `"${val.replace(/"/g, '""')}"`;
+    // Define exact headers matching the original format
+    const headers = [
+        "Branch", "Organization", "Date", "Schedule", "Studio", "Brand", "Platform", "Host Name", 
+        "Total Duration(s)", "Face Detected(s)", "Face(%)", 
+        "Facing Camera(s)", "Facing Camera(%)", 
+        "Head Down(s)", "Head Down(%)", 
+        "Not Facing(s)", "Not Facing(%)", 
+        "Off Frame(s)", "Off Frame(%)", 
+        "Speaking(s)", "Speaking(%)"
+    ];
+
+    const rows = filteredLogs.map(row => {
+        const rowData = [
+            row.branch || 'Unknown',
+            row.organization || 'Unknown',
+            row.dateDay || '-',
+            row.lsTime || '-',
+            row.studio_id || '-',
+            row.brand || '-',
+            row.platform || '-',
+            row.host_name || '-',
+            row.total_duration_seconds || 0,
+            row.face_detected_seconds || 0,
+            row.face_detected_pct || 0,
+            row.facing_camera_seconds || 0,
+            row.facing_camera_pct || 0,
+            row.head_down_seconds || 0,
+            row.head_down_pct || 0,
+            row.not_facing_seconds || 0,
+            row.not_facing_pct || 0,
+            row.off_frame_seconds || 0,
+            row.off_frame_pct || 0,
+            row.speaking_seconds || 0,
+            row.speaking_pct || 0
+        ];
+        
+        return rowData.map(val => {
+            const strVal = String(val);
+            if (strVal.includes(',') || strVal.includes('"') || strVal.includes('\n')) {
+                return `"${strVal.replace(/"/g, '""')}"`;
             }
-            return val;
-        }).join(',')
-    );
+            return strVal;
+        }).join(',');
+    });
 
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -147,7 +197,7 @@ async function loadAccounts() {
             <tr>
                 <td class="ps-4 fw-medium">${u.username}</td>
                 <td>
-                    <span class="badge ${u.role === 'superadmin' ? 'bg-danger' : (u.role === 'admin' ? 'bg-primary' : 'bg-dark')}">
+                    <span class="badge ${u.role === 'superadmin' ? 'bg-danger' : (u.role === 'admin' ? 'bg-primary' : 'bg-white')}">
                         ${u.role.toUpperCase()}
                     </span>
                 </td>

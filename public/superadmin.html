@@ -7,78 +7,24 @@
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body { 
             font-family: 'Inter', sans-serif; 
-            background-color: #000000;
-            color: #ededed;
         }
         h1, h2, h3, h4, h5, h6, .brand-font {
             font-family: 'Outfit', sans-serif !important;
             letter-spacing: -0.02em;
         }
-        .navbar { 
-            border-bottom: 1px solid #1f1f1f !important; 
-            background-color: rgba(0, 0, 0, 0.8) !important;
-            backdrop-filter: blur(12px);
-        }
-        .card { 
-            border: 1px solid #1f1f1f !important;
-            background-color: #0a0a0a !important; 
-            border-radius: 12px !important;
-            box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.5) !important;
-        }
-        .card-header {
-            border-bottom: 1px solid #1f1f1f !important;
-            background-color: transparent !important;
-        }
-        .nav-tabs .nav-link {
-            color: #a1a1aa;
-            border: none;
-            border-bottom: 2px solid transparent;
-            padding: 1rem 1.5rem;
-            font-weight: 500;
-        }
-        .nav-tabs .nav-link:hover {
-            color: #ededed;
-            border-color: transparent;
-        }
-        .nav-tabs .nav-link.active {
-            color: #ededed;
-            background: transparent;
-            border-color: #ededed;
-        }
-        .form-control, .form-select {
-            background-color: #000000 !important;
-            border: 1px solid #333 !important;
-            color: #ededed !important;
-            border-radius: 8px;
-        }
-        .form-control:focus, .form-select:focus {
-            border-color: #666 !important;
-            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1) !important;
-        }
-        .btn-primary {
-            background-color: #ededed !important;
-            color: #000000 !important;
-            border: 1px solid #ffffff !important;
-            font-weight: 500;
-            border-radius: 8px;
-        }
-        .btn-primary:hover {
-            background-color: #d4d4d4 !important;
-        }
-        .table { color: #ededed; }
-        .table th { border-bottom: 1px solid #333; background-color: #0a0a0a; color: #a1a1aa; font-weight: 500; }
-        .table td { border-bottom: 1px solid #1f1f1f; background-color: #0a0a0a; vertical-align: middle; }
+        .letter-spacing-1 { letter-spacing: 1px; }
     </style>
 </head>
 <body class="d-flex flex-column min-vh-100">
 
     <nav class="navbar navbar-expand-lg py-3 px-4">
         <div class="container-fluid">
-            <a class="navbar-brand d-flex align-items-center gap-2 fs-5 fw-semibold text-white" href="#">
+            <a class="navbar-brand d-flex align-items-center gap-2 fs-5 fw-semibold text-white" href="index.html">
                 <i data-lucide="shield-check" class="text-white"></i> ORCA <span class="text-secondary fw-normal px-2">|</span> Superadmin
             </a>
             <div class="ms-auto d-flex align-items-center gap-3">
@@ -90,7 +36,7 @@
 
     <div class="container-fluid p-4 flex-grow-1">
         <!-- Tabs Nav -->
-        <ul class="nav nav-tabs mb-4 border-secondary" id="adminTabs" role="tablist">
+        <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist" style="border-bottom-color: var(--theme-border);">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active d-flex align-items-center gap-2" data-bs-toggle="tab" data-bs-target="#analytics" type="button">
                     <i data-lucide="bar-chart-2" style="width: 18px;"></i> Analytics & Export
@@ -119,6 +65,22 @@
                             </div>
                             <div class="card-body d-flex flex-column gap-3">
                                 <div>
+                                    <label class="form-label small text-secondary">Branch</label>
+                                    <select id="filter-branch" class="form-select form-select-sm">
+                                        <option value="all">All Branches</option>
+                                        <option value="Jakarta">Jakarta</option>
+                                        <option value="Bandung">Bandung</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="form-label small text-secondary">Organization</label>
+                                    <select id="filter-organization" class="form-select form-select-sm">
+                                        <option value="all">All Organizations</option>
+                                        <option value="ORCA">ORCA</option>
+                                        <option value="Reckitt">Reckitt</option>
+                                    </select>
+                                </div>
+                                <div>
                                     <label class="form-label small text-secondary">Studio</label>
                                     <select id="filter-studio" class="form-select form-select-sm">
                                         <option value="all">All Studios</option>
@@ -131,13 +93,19 @@
                                     </select>
                                 </div>
                                 <div>
+                                    <label class="form-label small text-secondary">Platform</label>
+                                    <select id="filter-platform" class="form-select form-select-sm">
+                                        <option value="all">All Platforms</option>
+                                    </select>
+                                </div>
+                                <div>
                                     <label class="form-label small text-secondary">Host</label>
                                     <select id="filter-host" class="form-select form-select-sm">
                                         <option value="all">All Hosts</option>
                                     </select>
                                 </div>
                                 
-                                <hr class="border-secondary my-2">
+                                <hr class="my-2" style="border-color: var(--theme-border);">
                                 <div class="text-center">
                                     <span class="text-secondary small">Matching Sessions:</span>
                                     <h3 class="mb-3 fw-bold" id="match-count">0</h3>
@@ -158,8 +126,11 @@
                                         <thead>
                                             <tr>
                                                 <th class="ps-4 py-3">Date</th>
+                                                <th class="py-3">Branch</th>
+                                                <th class="py-3">Org</th>
                                                 <th class="py-3">Studio</th>
                                                 <th class="py-3">Brand</th>
+                                                <th class="py-3">Platform</th>
                                                 <th class="py-3">Host</th>
                                                 <th class="py-3">Total Duration</th>
                                                 <th class="py-3">Face %</th>

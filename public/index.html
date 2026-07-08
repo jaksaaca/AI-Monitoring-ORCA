@@ -18,67 +18,17 @@
     <style>
         body { 
             font-family: 'Inter', sans-serif; 
-            background-color: #000000; /* OLED Black */
-            color: #ededed;
         }
         h1, h2, h3, h4, h5, h6, .navbar-brand {
             font-family: 'Outfit', sans-serif !important;
             letter-spacing: -0.02em;
         }
-        .card { 
-            border: 1px solid #1f1f1f !important;
-            background-color: #0a0a0a !important; 
-            border-radius: 12px !important;
-            box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.5) !important;
-        }
-        .card-header {
-            border-bottom: 1px solid #1f1f1f !important;
-            background-color: transparent !important;
-        }
-        .navbar { 
-            border-bottom: 1px solid #1f1f1f !important; 
-            background-color: rgba(0, 0, 0, 0.8) !important;
-            backdrop-filter: blur(12px);
-        }
-        .btn-primary {
-            background-color: #ededed !important;
-            color: #000000 !important;
-            border: 1px solid #ffffff !important;
-            font-weight: 500;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-        }
-        .btn-primary:hover {
-            background-color: #d4d4d4 !important;
-            transform: translateY(-1px);
-        }
-        .btn-outline-light {
-            border: 1px solid #333 !important;
-            color: #ededed !important;
-            border-radius: 8px;
-        }
-        .btn-outline-light:hover {
-            background-color: #1a1a1a !important;
-            border-color: #444 !important;
-        }
-        .form-control, .form-select, .form-range {
-            background-color: #0a0a0a !important;
-            border: 1px solid #333 !important;
-            color: #ededed !important;
-            border-radius: 8px;
-        }
-        .form-control:focus, .form-select:focus {
-            border-color: #666 !important;
-            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1) !important;
-        }
-        .text-secondary { color: #a1a1aa !important; }
-        .bg-dark { background-color: #0a0a0a !important; }
-        .border-secondary { border-color: #1f1f1f !important; }
         
         /* Modern Badges */
         .badge.bg-success { background-color: rgba(16, 185, 129, 0.1) !important; color: #10b981 !important; border: 1px solid rgba(16,185,129,0.2) !important; }
         .badge.bg-danger { background-color: rgba(239, 68, 68, 0.1) !important; color: #ef4444 !important; border: 1px solid rgba(239,68,68,0.2) !important; }
         .badge.bg-dark { background-color: rgba(255, 255, 255, 0.05) !important; color: #a1a1aa !important; border: 1px solid rgba(255,255,255,0.1) !important; }
+        .letter-spacing-1 { letter-spacing: 1px; }
     </style>
 </head>
 <body class="d-flex flex-column vh-100">
@@ -104,16 +54,13 @@
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-2 px-4 shadow-sm">
             <div class="container-fluid px-0">
                 <a class="navbar-brand d-flex align-items-center gap-2 fs-6 fw-semibold" href="#">
-                    <i data-lucide="radio" class="icon-md"></i> ORCA <span class="text-secondary fw-normal px-2">|</span> Host Monitoring System
+                    <i data-lucide="radio" class="icon-md text-white"></i> ORCA <span class="text-secondary fw-normal px-2">|</span> Host Monitoring System
                 </a>
                 <span class="badge bg-secondary ms-2 text-uppercase letter-spacing-1">Operator</span>
                 
                 <div class="ms-auto d-flex align-items-center gap-3">
-                    <span class="text-secondary small">Logged in as <strong class="text-white" id="nav-user">...</strong></span>
-                    <button id="btn-logout" class="btn btn-outline-secondary btn-sm me-3">Logout</button>
-                    
-                    <a href="admin.html" class="btn btn-outline-light btn-sm d-flex align-items-center gap-1">
-                        <i data-lucide="settings" class="icon-sm"></i> Master Control
+                    <a href="login.html" class="btn btn-outline-light btn-sm d-flex align-items-center gap-1">
+                        <i data-lucide="lock" class="icon-sm"></i> Admin Login
                     </a>
                     <div class="border border-secondary rounded px-3 py-1 bg-dark d-flex align-items-center gap-2">
                         <span id="system-dot" class="dot-ready"></span>
@@ -144,7 +91,7 @@
                                 </select>
                             </div>
 
-                            <div class="bg-dark border border-secondary rounded p-3">
+                            <div class="bg-dark rounded p-3" style="border: 1px solid var(--theme-border);">
                                 <div class="d-flex justify-content-between mb-2 small">
                                     <span class="text-secondary">Host</span>
                                     <span id="info-host" class="fw-medium text-end">-</span>
@@ -296,6 +243,28 @@
                         </div>
                     </div>
 
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Branch Selection Modal -->
+    <div class="modal fade" id="branchModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title fw-bold text-white">Select Your Location</h5>
+                </div>
+                <div class="modal-body py-4">
+                    <p class="text-secondary mb-4 text-center">Please select your current branch to load the correct monitoring schedule.</p>
+                    <div class="d-grid gap-3">
+                        <button type="button" class="btn btn-outline-light btn-lg" onclick="selectBranch('Jakarta')">
+                            <i data-lucide="map-pin" class="icon-sm me-2"></i> Jakarta Studio
+                        </button>
+                        <button type="button" class="btn btn-outline-light btn-lg" onclick="selectBranch('Bandung')">
+                            <i data-lucide="map-pin" class="icon-sm me-2"></i> Bandung Studio
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

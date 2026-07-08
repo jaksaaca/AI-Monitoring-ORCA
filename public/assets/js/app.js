@@ -16,19 +16,24 @@ import { drawOverlay } from './modules/canvas-overlay.js';
 import { playSoftWarning } from './modules/audio-warning.js';
 import { listenToSchedule, saveSessionLog } from './modules/firebase-db.js';
 
-// Check Auth
-const authData = JSON.parse(sessionStorage.getItem('orca_auth'));
-if (!authData) {
-    window.location.href = 'login.html';
-}
-document.getElementById('nav-user').textContent = authData.username;
-document.getElementById('btn-logout').addEventListener('click', () => {
-    sessionStorage.removeItem('orca_auth');
-    window.location.href = 'login.html';
-});
+// Branch Selection
+let currentBranch = sessionStorage.getItem('orca_branch');
+let branchModalInstance = null;
 
-// ============================================
-// DOM ELEMENT REFERENCES
+window.selectBranch = function(branch) {
+    sessionStorage.setItem('orca_branch', branch);
+    currentBranch = branch;
+    if (branchModalInstance) branchModalInstance.hide();
+    
+    // Update label on UI
+    document.getElementById('system-status-text').textContent = `System Ready (${branch})`;
+    
+    // Trigger reload of schedule if it was already fetched
+    if (scheduleDb.length > 0) {
+        populateStudios();
+    }
+};
+
 // ============================================
 const loadingScreen  = document.getElementById('loading-screen');
 const loadingBar     = document.getElementById('loading-bar');
@@ -77,7 +82,9 @@ let currentPoseClass = 'Depan';
 let currentFaceDetected = false;
 
 // Frame skipping — process AI every N frames for performance
-const AI_FRAME_SKIP  = 3;
+const AI_FRAME_SKIP  = 5; // default balanced
+const currentVideoWidth = 1280;
+const currentVideoHeight = 720;
 let frameCount       = 0;
 let lastFaces        = [];
 
@@ -91,6 +98,13 @@ let currentFps       = 0;
 // ============================================
 async function initialize() {
     try {
+        if (!currentBranch) {
+            branchModalInstance = new bootstrap.Modal(document.getElementById('branchModal'));
+            branchModalInstance.show();
+        } else {
+            document.getElementById('system-status-text').textContent = `System Ready (${currentBranch})`;
+        }
+
         setLoadingProgress(5, 'Initializing ONNX Runtime...');
 
         // Step 1: Initialize ONNX Runtime (Gaze Classifier)
@@ -123,31 +137,7 @@ async function initialize() {
         // Listen to schedule from Firebase Cloud
         listenToSchedule((data) => {
             scheduleDb = data;
-            
-            // Get unique studios from schedule
-            const studios = [...new Set(scheduleDb.map(s => s.studio).filter(Boolean))];
-            
-            // If no schedule, keep default or empty
-            if (studios.length > 0) {
-                studioSelect.innerHTML = '<option value="" disabled selected>Choose Studio...</option>';
-                studios.sort().forEach(studio => {
-                    const opt = document.createElement('option');
-                    opt.value = studio;
-                    opt.textContent = studio;
-                    studioSelect.appendChild(opt);
-                });
-            } else {
-                studioSelect.innerHTML = '<option value="" disabled selected>No Schedule Uploaded</option>';
-                infoHost.textContent = "-";
-                infoBrand.textContent = "-";
-                infoTime.textContent = "-";
-                activeSchedule = null;
-            }
-            
-            // If user already selected a studio, refresh the UI
-            if (studioSelect.value) {
-                studioSelect.dispatchEvent(new Event('change'));
-            }
+            if (currentBranch) populateStudios();
         });
 
         // Wait a moment then show app
@@ -188,8 +178,8 @@ async function startCamera(deviceId = null) {
 
     const constraints = {
         video: deviceId
-            ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1920 } }
-            : { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1920 } },
+            ? { deviceId: { exact: deviceId }, width: { ideal: 640 } }
+            : { facingMode: 'user', width: { ideal: 640 } },
         audio: false
     };
 
@@ -210,8 +200,8 @@ async function startCamera(deviceId = null) {
 }
 
 function resizeCanvas() {
-    canvasEl.width = videoEl.videoWidth || 1280;
-    canvasEl.height = videoEl.videoHeight || 720;
+    canvasEl.width = videoEl.videoWidth || currentVideoWidth;
+    canvasEl.height = videoEl.videoHeight || currentVideoHeight;
 }
 
 async function populateDevices() {
@@ -258,6 +248,12 @@ function renderLoop(timestamp) {
 
     // Don't process if video isn't playing
     if (videoEl.readyState < 2) return;
+
+    // Ensure canvas exactly matches video dimensions to prevent misalignment
+    if (videoEl.videoWidth > 0 && (canvasEl.width !== videoEl.videoWidth || canvasEl.height !== videoEl.videoHeight)) {
+        canvasEl.width = videoEl.videoWidth;
+        canvasEl.height = videoEl.videoHeight;
+    }
 
     frameCount++;
 
@@ -320,25 +316,25 @@ function updateBadges() {
     // Face badge
     if (currentFaceDetected) {
         badgeFace.innerHTML = '<span class="dot-ready bg-white"></span> Face';
-        badgeFace.className = 'badge bg-success d-flex align-items-center gap-2 border border-secondary opacity-75';
+        badgeFace.className = 'badge bg-success d-flex align-items-center gap-2 border border-light-subtle opacity-75';
     } else {
         badgeFace.innerHTML = '<span class="dot-ready bg-white"></span> Face';
-        badgeFace.className = 'badge bg-danger d-flex align-items-center gap-2 border border-secondary opacity-75';
+        badgeFace.className = 'badge bg-danger d-flex align-items-center gap-2 border border-light-subtle opacity-75';
     }
 
     // Pose badge
     badgePose.innerHTML = `<span class="dot-ready bg-white"></span> Pose: ${currentPoseClass}`;
     badgePose.className = currentFaceDetected 
-        ? 'badge bg-success d-flex align-items-center gap-2 border border-secondary opacity-75' 
-        : 'badge bg-dark d-flex align-items-center gap-2 border border-secondary opacity-75';
+        ? 'badge bg-success d-flex align-items-center gap-2 border border-light-subtle opacity-75' 
+        : 'badge bg-white d-flex align-items-center gap-2 border border-light-subtle opacity-75';
 
     // Speech badge
     if (VAD.isSpeaking()) {
         badgeSpeak.innerHTML = '<span class="dot-ready bg-white"></span> Voice';
-        badgeSpeak.className = 'badge bg-success d-flex align-items-center gap-2 border border-secondary opacity-75';
+        badgeSpeak.className = 'badge bg-success d-flex align-items-center gap-2 border border-light-subtle opacity-75';
     } else {
         badgeSpeak.innerHTML = '<span class="dot-ready bg-white"></span> Voice';
-        badgeSpeak.className = 'badge bg-dark d-flex align-items-center gap-2 border border-secondary opacity-75';
+        badgeSpeak.className = 'badge bg-white d-flex align-items-center gap-2 border border-light-subtle opacity-75';
     }
 
     // Session stats (update every loop frame for smooth display)
@@ -371,12 +367,43 @@ const infoHost = document.getElementById('info-host');
 const infoBrand = document.getElementById('info-brand');
 const infoTime = document.getElementById('info-time');
 
+function populateStudios() {
+    // Filter schedule by selected branch
+    const branchSchedule = scheduleDb.filter(s => s.branch === currentBranch);
+    
+    // Get unique studios from filtered schedule
+    const studios = [...new Set(branchSchedule.map(s => s.studio).filter(Boolean))];
+    
+    if (studios.length > 0) {
+        studioSelect.innerHTML = '<option value="" disabled selected>Choose Studio...</option>';
+        studios.sort().forEach(studio => {
+            const opt = document.createElement('option');
+            opt.value = studio;
+            opt.textContent = studio;
+            studioSelect.appendChild(opt);
+        });
+    } else {
+        studioSelect.innerHTML = '<option value="" disabled selected>No Schedule Uploaded for ' + currentBranch + '</option>';
+        infoHost.textContent = "-";
+        infoBrand.textContent = "-";
+        infoTime.textContent = "-";
+        activeSchedule = null;
+    }
+    
+    if (studioSelect.value) {
+        studioSelect.dispatchEvent(new Event('change'));
+    }
+}
+
 // Update UI when Studio changes
 studioSelect.addEventListener('change', () => {
     const studio = studioSelect.value;
     
-    // Filter schedules for this studio
-    const studioSchedules = scheduleDb.filter(s => s.studio.toLowerCase() === studio.toLowerCase());
+    // Filter schedules for this studio AND current branch
+    const studioSchedules = scheduleDb.filter(s => 
+        s.studio.toLowerCase() === studio.toLowerCase() && 
+        s.branch === currentBranch
+    );
     
     if (studioSchedules.length === 0) {
         infoHost.textContent = "No Schedule Found";
@@ -469,10 +496,13 @@ btnStop.addEventListener('click', async () => {
     
     // Save to Firebase Cloud
     const logData = {
+        branch: currentBranch,
+        organization: activeSchedule.organization || 'Unknown',
         dateDay: new Date().toLocaleDateString('en-GB'),
         lsTime: `${activeSchedule.startTime} - ${activeSchedule.endTime}`,
         host_name: activeSchedule.hostName,
         brand: activeSchedule.brand,
+        platform: activeSchedule.platform || '-',
         studio_id: activeSchedule.studio,
         location: activeSchedule.location,
         program_schedule: activeSchedule.startTime,
