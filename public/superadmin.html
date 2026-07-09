@@ -3,10 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ORCA — Superadmin Dashboard</title>
+    <title>ORCA | SUPERADMIN</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+    <style>
+        /* Tom Select Dark Mode Overrides */
+        .ts-control {
+            background-color: rgba(0,0,0,0.2) !important;
+            border: 1px solid var(--theme-border) !important;
+            color: var(--theme-text) !important;
+            border-radius: 8px !important;
+            padding: 0.35rem 0.75rem !important;
+        }
+        .ts-control.focus {
+            border-color: var(--theme-primary) !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+        }
+        .ts-dropdown {
+            background-color: var(--theme-surface) !important;
+            border: 1px solid var(--theme-border) !important;
+            color: var(--theme-text) !important;
+            border-radius: 8px !important;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
+        }
+        .ts-dropdown .option {
+            color: var(--theme-text) !important;
+        }
+        .ts-dropdown .option:hover, .ts-dropdown .option.active {
+            background-color: var(--theme-primary) !important;
+            color: white !important;
+        }
+        .ts-control input {
+            color: var(--theme-text) !important;
+        }
+        .ts-wrapper.single .ts-control:after {
+            border-color: var(--theme-text-muted) transparent transparent transparent !important;
+        }
+    </style>
     <link rel="stylesheet" href="assets/css/style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -25,7 +62,7 @@
     <nav class="navbar navbar-expand-lg py-3 px-4">
         <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center gap-2 fs-5 fw-semibold text-white" href="index.html">
-                <i data-lucide="shield-check" class="text-white"></i> ORCA <span class="text-secondary fw-normal px-2">|</span> Superadmin
+                <i data-lucide="shield-check" class="text-white"></i> ORCA <span class="text-secondary fw-normal px-2">|</span> SUPERADMIN
             </a>
             <div class="ms-auto d-flex align-items-center gap-3">
                 <span class="text-secondary small">Logged in as <strong class="text-white" id="display-user">...</strong></span>
@@ -53,129 +90,119 @@
         <div class="tab-content" id="adminTabsContent">
             
             <!-- ANALYTICS TAB -->
+            
             <div class="tab-pane fade show active" id="analytics" role="tabpanel">
-                <div class="row g-4">
-                    <!-- Filters -->
-                    <div class="col-lg-3">
-                        <div class="card h-100">
-                            <div class="card-header py-3">
-                                <h6 class="mb-0 fw-semibold d-flex align-items-center gap-2">
-                                    <i data-lucide="filter" class="text-secondary" style="width: 18px;"></i> Data Filters
-                                </h6>
+                
+                <!-- Horizontal Filter Card -->
+                <div class="card mb-4 border-secondary">
+                    <div class="card-body p-4">
+                        <div class="row g-4">
+                            <!-- Dropdowns -->
+                            <div class="col-md-2">
+                                <label class="form-label small text-secondary">Location</label>
+                                <select id="filter-branch" class="form-select form-select-sm">
+                                    <option value="all">All Branches</option>
+                                    <option value="Jakarta">Jakarta</option>
+                                    <option value="Bandung">Bandung</option>
+                                </select>
                             </div>
-                            <div class="card-body d-flex flex-column gap-3">
-                                
-                                <!-- FETCH BY DATE -->
-                                <div class="p-3 border rounded border-secondary bg-dark bg-opacity-10">
-                                    <h6 class="small fw-semibold text-secondary mb-2">PULL DATA DARI SERVER</h6>
-                                    <div class="d-flex flex-column gap-2">
-                                        <div>
-                                            <label class="form-label small text-secondary mb-1">Dari Tanggal</label>
-                                            <input type="date" id="fetch-start-date" class="form-control form-control-sm">
-                                        </div>
-                                        <div>
-                                            <label class="form-label small text-secondary mb-1">Sampai Tanggal</label>
-                                            <input type="date" id="fetch-end-date" class="form-control form-control-sm">
-                                        </div>
-                                        <button id="btn-fetch-data" class="btn btn-outline-primary btn-sm mt-1 w-100 d-flex align-items-center justify-content-center gap-2">
-                                            <i data-lucide="database-zap" style="width: 16px;"></i> Tarik Data
-                                        </button>
-                                    </div>
-                                </div>
-                                <hr class="my-0" style="border-color: var(--theme-border);">
+                            <div class="col-md-2">
+                                <label class="form-label small text-secondary">Platform</label>
+                                <select id="filter-platform" class="form-select form-select-sm">
+                                    <option value="all">All Platforms</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-secondary">Brand</label>
+                                <select id="filter-brand" class="form-select form-select-sm">
+                                    <option value="all">All Brands</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-secondary">Host</label>
+                                <select id="filter-host" class="form-select form-select-sm">
+                                    <option value="all">All Hosts</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-secondary">Studio</label>
+                                <select id="filter-studio" class="form-select form-select-sm">
+                                    <option value="all">All Studios</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-secondary">Organization</label>
+                                <select id="filter-organization" class="form-select form-select-sm">
+                                    <option value="all">All Organizations</option>
+                                    <option value="ORCA">ORCA</option>
+                                    <option value="Reckitt">Reckitt</option>
+                                </select>
+                            </div>
 
-                                <div>
-                                    <label class="form-label small text-secondary">Branch</label>
-                                    <select id="filter-branch" class="form-select form-select-sm">
-                                        <option value="all">All Branches</option>
-                                        <option value="Jakarta">Jakarta</option>
-                                        <option value="Bandung">Bandung</option>
-                                    </select>
+                            <div class="col-12 mt-4 d-flex flex-wrap justify-content-between align-items-end gap-3">
+                                <div class="d-flex flex-wrap gap-2 align-items-center bg-dark bg-opacity-25 border border-secondary p-2 rounded-3">
+                                    <span class="small fw-semibold text-secondary ps-2">Date Range:</span>
+                                    <div style="width: 220px;">
+                                        <input type="text" id="fetch-date-range" class="form-control form-control-sm text-center" placeholder="Select Date Range...">
+                                    </div>
+                                    <button id="btn-fetch-data" class="btn btn-sm btn-outline-primary px-3 d-flex align-items-center gap-2">
+                                        <i data-lucide="database-zap" style="width: 14px;"></i>
+                                    </button>
                                 </div>
-                                <div>
-                                    <label class="form-label small text-secondary">Organization</label>
-                                    <select id="filter-organization" class="form-select form-select-sm">
-                                        <option value="all">All Organizations</option>
-                                        <option value="ORCA">ORCA</option>
-                                        <option value="Reckitt">Reckitt</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="form-label small text-secondary">Studio</label>
-                                    <select id="filter-studio" class="form-select form-select-sm">
-                                        <option value="all">All Studios</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="form-label small text-secondary">Brand</label>
-                                    <select id="filter-brand" class="form-select form-select-sm">
-                                        <option value="all">All Brands</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="form-label small text-secondary">Platform</label>
-                                    <select id="filter-platform" class="form-select form-select-sm">
-                                        <option value="all">All Platforms</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="form-label small text-secondary">Host</label>
-                                    <select id="filter-host" class="form-select form-select-sm">
-                                        <option value="all">All Hosts</option>
-                                    </select>
-                                </div>
-                                
-                                <hr class="my-2" style="border-color: var(--theme-border);">
-                                <div class="text-center">
-                                    <span class="text-secondary small">Matching Sessions:</span>
-                                    <h3 class="mb-3 fw-bold" id="match-count">0</h3>
-                                    <button id="btn-download" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
-                                        <i data-lucide="download" style="width: 18px;"></i> Download CSV
+                                <div class="text-end d-flex align-items-center gap-3">
+                                    <span class="text-secondary small">Matches: <strong id="match-count" class="text-white fs-6">0</strong></span>
+                                    <button id="btn-download" class="btn btn-sm btn-primary px-4 d-inline-flex align-items-center gap-2">
+                                        <i data-lucide="download" style="width: 14px;"></i> Export CSV
                                     </button>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Data Table -->
-                    <div class="col-lg-9">
-                        <div class="card h-100">
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-hover mb-0">
-                                        <thead>
-                                            <tr>
-                                                <th class="ps-4 py-3">Date</th>
-                                                <th class="py-3">Branch</th>
-                                                <th class="py-3">Org</th>
-                                                <th class="py-3">Studio</th>
-                                                <th class="py-3">Brand</th>
-                                                <th class="py-3">Platform</th>
-                                                <th class="py-3">Host</th>
-                                                <th class="py-3">Total Duration</th>
-                                                <th class="py-3">Face %</th>
-                                                <th class="py-3">Speak %</th>
-                                                <th class="py-3 pe-4 text-end">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="logs-tbody">
-                                            <tr><td colspan="8" class="text-center py-4 text-secondary">Loading data from Firebase...</td></tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <div class="card-footer bg-transparent py-3 d-flex flex-column flex-md-row justify-content-between align-items-center gap-3 border-top border-secondary">
-                                <small class="text-secondary" id="pagination-info">Showing 0 of 0 entries</small>
-                                <nav>
-                                    <ul class="pagination pagination-sm mb-0" id="pagination-ul">
-                                        <!-- Pagination generated via JS -->
-                                    </ul>
-                                </nav>
-                            </div>
+                                <div class="d-flex justify-content-end mb-3">
+                    <button id="btn-delete-multiple" class="btn btn-sm text-white d-flex align-items-center gap-2 px-3 py-2 shadow-sm" style="background-color: #EF4444; border-radius: 6px; font-weight: 500;" disabled>
+                        <i data-lucide="trash-2" style="width: 16px;"></i> Delete Multiple Schedules
+                    </button>
+                </div>
+                <!-- Data Table -->
+                <div class="card border-secondary">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover align-middle mb-0" style="font-size: 0.85rem; border-color: var(--theme-border);">
+                                <thead style="background-color: rgba(0,0,0,0.2);">
+                                    <tr class="text-center text-uppercase text-secondary fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                        <th class="py-3" style="width: 40px; border-bottom: 2px solid var(--theme-border);"><input id="check-all" class="form-check-input bg-transparent border-secondary" type="checkbox"></th>
+                                        <th class="py-3" style="border-bottom: 2px solid var(--theme-border);">Branch</th>
+                                        <th class="py-3" style="border-bottom: 2px solid var(--theme-border);">Organization</th>
+                                        <th class="py-3" style="border-bottom: 2px solid var(--theme-border);">Date</th>
+                                        <th class="py-3" style="border-bottom: 2px solid var(--theme-border);">Schedule</th>
+                                        <th class="py-3" style="border-bottom: 2px solid var(--theme-border);">Studio</th>
+                                        <th class="py-3" style="border-bottom: 2px solid var(--theme-border);">Brand</th>
+                                        <th class="py-3" style="border-bottom: 2px solid var(--theme-border);">Platform</th>
+                                        <th class="py-3" style="border-bottom: 2px solid var(--theme-border);">Host Name</th>
+                                        <th class="py-3" style="border-bottom: 2px solid var(--theme-border);">Facing Camera(%)</th>
+                                        <th class="py-3" style="border-bottom: 2px solid var(--theme-border);">Speaking(%)</th>
+                                        <th class="py-3" style="border-bottom: 2px solid var(--theme-border);">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="logs-tbody" class="text-center">
+                                    <tr><td colspan="12" class="text-center py-5 text-secondary">Loading data from Firebase...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
+                    </div>
+                    <div class="card-footer bg-transparent py-3 d-flex flex-column flex-md-row justify-content-between align-items-center gap-3 border-top border-secondary">
+                        <small class="text-secondary" id="pagination-info">Showing 0 of 0 entries</small>
+                        <nav>
+                            <ul class="pagination pagination-sm mb-0" id="pagination-ul">
+                                <!-- Pagination generated via JS -->
+                            </ul>
+                        </nav>
                     </div>
                 </div>
             </div>
+
 
             <!-- ACCOUNTS TAB -->
             <div class="tab-pane fade" id="accounts" role="tabpanel">
@@ -246,6 +273,8 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
     <script>lucide.createIcons();</script>
     <script type="module" src="assets/js/superadmin.js"></script>
 </body>

@@ -29,6 +29,42 @@
         .badge.bg-danger { background-color: rgba(239, 68, 68, 0.1) !important; color: #ef4444 !important; border: 1px solid rgba(239,68,68,0.2) !important; }
         .badge.bg-dark { background-color: rgba(255, 255, 255, 0.05) !important; color: #a1a1aa !important; border: 1px solid rgba(255,255,255,0.1) !important; }
         .letter-spacing-1 { letter-spacing: 1px; }
+    
+        /* Mobile & Tablet Responsiveness */
+        @media (max-width: 991.98px) {
+            body { 
+                height: auto !important; 
+                min-height: 100vh;
+                overflow-x: hidden;
+            }
+            #app-container {
+                height: auto !important;
+            }
+            .container-fluid.h-100, .row.h-100 {
+                height: auto !important;
+            }
+            .col-lg-3, .col-lg-9 {
+                height: auto !important;
+                overflow: visible !important;
+            }
+            .camera-container {
+                min-height: 40vh !important;
+                flex-grow: 0 !important;
+            }
+            /* Stats grid adjustments for smaller screens */
+            .row.g-3 > div {
+                margin-top: 0.5rem;
+            }
+            .card-body h4 {
+                font-size: 1.25rem !important;
+            }
+        }
+        @media (min-width: 992px) {
+            .camera-container {
+                min-height: 450px;
+            }
+        }
+
     </style>
 </head>
 <body class="d-flex flex-column vh-100">
@@ -144,6 +180,10 @@
                                     <span id="vad-val" class="small text-secondary">0.050</span>
                                 </div>
                                 <input type="range" class="form-range" id="vad-slider" min="0.01" max="0.3" step="0.01" value="0.05">
+                                <!-- Visual Volume Bar -->
+                                <div class="progress mt-2 bg-secondary bg-opacity-25" style="height: 6px;">
+                                    <div id="vad-meter-bar" class="progress-bar bg-secondary" role="progressbar" style="width: 0%; transition: width 0.1s ease-out, background-color 0.2s;"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -271,13 +311,34 @@
                         <button type="button" class="btn btn-outline-light btn-lg" onclick="selectBranch('Bandung')">
                             <i data-lucide="map-pin" class="icon-sm me-2"></i> Bandung Studio
                         </button>
+                        <button class="btn btn-primary w-100 fw-bold py-2 mt-4" id="btn-confirm-branch">Masuk ke Operator</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Footer -->
+    <!-- End Session Modal -->
+    <div class="modal fade" id="endSessionModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title fw-bold text-success d-flex align-items-center gap-2">
+                        <i data-lucide="check-circle"></i> Sesi Selesai
+                    </h5>
+                </div>
+                <div class="modal-body py-4 text-center">
+                    <p class="text-white mb-2 fs-5" id="endSessionMessage">Sesi telah diakhiri dan data berhasil disimpan.</p>
+                    <p class="small text-secondary mb-0">Sistem kembali dalam posisi Standby.</p>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-primary w-100 fw-bold" data-bs-dismiss="modal">Oke, Mengerti</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase App (Module) -->
     <footer class="text-center py-3 mt-auto" style="border-top: 1px solid var(--theme-border); background-color: var(--theme-bg);">
         <small class="text-secondary">&copy; 2026 ORCA Operator. Developed by Jaksa Setia Alam</small>
     </footer>

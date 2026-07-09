@@ -33,9 +33,24 @@ export async function start(deviceId = null) {
 
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         sourceNode = audioCtx.createMediaStreamSource(mediaStream);
+        
+        // Filter 1: Highpass (memotong dengung listrik/bass lagu di bawah 300Hz)
+        const highpass = audioCtx.createBiquadFilter();
+        highpass.type = 'highpass';
+        highpass.frequency.value = 300;
+        
+        // Filter 2: Lowpass (memotong noise statis/desis di atas 3000Hz)
+        const lowpass = audioCtx.createBiquadFilter();
+        lowpass.type = 'lowpass';
+        lowpass.frequency.value = 3000;
+
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 2048;
-        sourceNode.connect(analyser);
+        
+        // Route: Source -> Highpass -> Lowpass -> Analyser
+        sourceNode.connect(highpass);
+        highpass.connect(lowpass);
+        lowpass.connect(analyser);
 
         timeDomainBuf = new Float32Array(analyser.fftSize);
 

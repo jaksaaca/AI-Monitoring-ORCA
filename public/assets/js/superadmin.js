@@ -97,25 +97,48 @@ function renderLogs() {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedLogs = filteredLogs.slice(startIndex, startIndex + itemsPerPage);
 
-    tbodyLogs.innerHTML = paginatedLogs.map(l => `
+    tbodyLogs.innerHTML = paginatedLogs.map(l => {
+        const dateObj = l.timestamp ? new Date(l.timestamp) : null;
+        
+        let dateStr = l['dateDay'] || '-';
+        if (dateObj) {
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const yyyy = dateObj.getFullYear();
+            dateStr = `${dd}/${mm}/${yyyy}`;
+        }
+
+        let scheduleStr = l.lsTime || '-';
+
+        return `
         <tr>
-            <td class="ps-4">${l.timestamp ? new Date(l.timestamp).toLocaleString() : l['dateDay'] || '-'}</td>
-            <td><span class="badge bg-secondary">${l.branch || '-'}</span></td>
-            <td><span class="badge bg-info text-dark">${l.organization || '-'}</span></td>
-            <td><span class="badge bg-light text-dark border">${l.studio_id || '-'}</span></td>
-            <td>${l.brand || '-'}</td>
-            <td><span class="badge bg-primary">${l.platform || '-'}</span></td>
-            <td>${l.host_name || '-'}</td>
-            <td>${l.total_duration_seconds}s</td>
-            <td class="${l.face_detected_pct < 50 ? 'text-danger' : 'text-success'}">${l.face_detected_pct}%</td>
-            <td class="${l.speaking_pct < 20 ? 'text-warning' : 'text-success'}">${l.speaking_pct}%</td>
-            <td class="text-end pe-4">
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteLog('${l.id}')" title="Delete Log">
-                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
-                </button>
+            <td><input class="form-check-input bg-transparent border-secondary log-checkbox" type="checkbox" data-id="${l.id}"></td>
+            <td class="text-nowrap">${l.branch || '-'}</td>
+            <td class="text-nowrap">${l.organization || '-'}</td>
+            <td class="text-nowrap fw-medium">${dateStr}</td>
+            <td class="text-nowrap">${scheduleStr}</td>
+            <td class="text-nowrap">${l.studio_id || '-'}</td>
+            <td class="fw-medium text-white">${l.brand || '-'}</td>
+            <td>${l.platform || '-'}</td>
+            <td class="text-uppercase fw-semibold text-white">${l.host_name || '-'}</td>
+            <td class="fw-bold ${l.face_detected_pct < 50 ? 'text-danger' : 'text-success'}">${l.face_detected_pct}</td>
+            <td class="fw-bold ${l.speaking_pct < 20 ? 'text-warning' : 'text-success'}">${l.speaking_pct}</td>
+            <td>
+                <div class="d-flex justify-content-center gap-1">
+                    <button class="btn btn-sm text-white d-flex align-items-center gap-1 px-2 py-1 shadow-sm" style="background-color: #531165; border-radius: 4px; font-size: 0.75rem;" onclick="alert('Detail feature coming soon')">
+                        <i data-lucide="eye" style="width: 12px; height: 12px;"></i> Detail
+                    </button>
+                    <button class="btn btn-sm text-dark d-flex align-items-center gap-1 px-2 py-1 shadow-sm" style="background-color: #F59E0B; border-radius: 4px; font-size: 0.75rem; font-weight: 500;" onclick="alert('Edit feature coming soon')">
+                        <i data-lucide="edit-2" style="width: 12px; height: 12px;"></i> Edit
+                    </button>
+                    <button class="btn btn-sm text-white d-flex align-items-center gap-1 px-2 py-1 shadow-sm" style="background-color: #EF4444; border-radius: 4px; font-size: 0.75rem;" onclick="deleteLog('${l.id}')">
+                        <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i> Delete
+                    </button>
+                </div>
             </td>
         </tr>
-    `).join('');
+        `;
+    }).join('');
     lucide.createIcons();
     
     const endCount = Math.min(startIndex + itemsPerPage, filteredLogs.length);
@@ -338,3 +361,78 @@ window.deleteAccount = async (id, username) => {
 // Init
 loadAnalytics();
 loadAccounts();
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Check All logic
+    const checkAll = document.getElementById('check-all');
+    const btnDeleteMultiple = document.getElementById('btn-delete-multiple');
+
+    if (checkAll) {
+        checkAll.addEventListener('change', (e) => {
+            const checkboxes = document.querySelectorAll('.log-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = e.target.checked;
+            });
+            updateBulkDeleteButton();
+        });
+    }
+
+    // Delegate change event for individual checkboxes
+    document.addEventListener('change', (e) => {
+        if (e.target.classList.contains('log-checkbox')) {
+            updateBulkDeleteButton();
+            // Update check-all state
+            const checkboxes = Array.from(document.querySelectorAll('.log-checkbox'));
+            if (checkAll) {
+                checkAll.checked = checkboxes.length > 0 && checkboxes.every(cb => cb.checked);
+            }
+        }
+    });
+
+    function updateBulkDeleteButton() {
+        if (btnDeleteMultiple) {
+            const anyChecked = document.querySelectorAll('.log-checkbox:checked').length > 0;
+            btnDeleteMultiple.disabled = !anyChecked;
+        }
+    }
+
+    // Bulk Delete Action
+    if (btnDeleteMultiple) {
+        btnDeleteMultiple.addEventListener('click', async () => {
+            const checked = document.querySelectorAll('.log-checkbox:checked');
+            const idsToDelete = Array.from(checked).map(cb => cb.getAttribute('data-id'));
+            
+            if (idsToDelete.length === 0) return;
+
+            if (confirm(`Are you sure you want to permanently delete ${idsToDelete.length} schedules? This cannot be undone.`)) {
+                btnDeleteMultiple.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Deleting...';
+                btnDeleteMultiple.disabled = true;
+
+                try {
+                    // Delete all in parallel
+                    await Promise.all(idsToDelete.map(id => window.deleteSessionLog(id)));
+                    
+                    // Remove from local array
+                    allLogs = allLogs.filter(l => !idsToDelete.includes(l.id));
+                    
+                    // Reset check-all
+                    if (checkAll) checkAll.checked = false;
+                    
+                    // Re-render
+                    renderLogs();
+                } catch (e) {
+                    alert("Error deleting multiple schedules: " + e.message);
+                } finally {
+                    btnDeleteMultiple.innerHTML = '<i data-lucide="trash-2" style="width: 16px;"></i> Delete Multiple Schedules';
+                    btnDeleteMultiple.disabled = true; // Still disabled because selection is gone
+                    if (window.lucide) window.lucide.createIcons();
+                }
+            }
+        });
+    }
+});
+
+// Since window.deleteSessionLog is needed, let's expose it if not already
+
+window.deleteSessionLog = deleteSessionLog;

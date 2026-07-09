@@ -325,6 +325,29 @@ function renderLoop(timestamp) {
 
     // Update UI badges
     updateBadges();
+    updateVadMeter();
+}
+
+function updateVadMeter() {
+    const meterBar = document.getElementById('vad-meter-bar');
+    if (!meterBar) return;
+    
+    const rms = VAD.getRms();
+    const threshold = VAD.getThreshold();
+    
+    // Scale RMS for visual bar (0.15 RMS = 100% width)
+    let pct = (rms / 0.15) * 100;
+    if (pct > 100) pct = 100;
+    
+    meterBar.style.width = pct + '%';
+    
+    if (rms > threshold) {
+        meterBar.classList.remove('bg-secondary');
+        meterBar.classList.add('bg-success');
+    } else {
+        meterBar.classList.remove('bg-success');
+        meterBar.classList.add('bg-secondary');
+    }
 }
 
 async function processAI(timestamp) {
@@ -413,7 +436,7 @@ function populateStudios() {
     
     if (studios.length > 0) {
         studioSelect.innerHTML = '<option value="" disabled selected>Choose Studio...</option>';
-        studios.sort().forEach(studio => {
+        studios.sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).forEach(studio => {
             const opt = document.createElement('option');
             opt.value = studio;
             opt.textContent = studio;
@@ -475,9 +498,8 @@ studioSelect.addEventListener('change', () => {
     // Sort by start time
     todaySchedules.sort((a, b) => a.startTime.localeCompare(b.startTime));
     
-    // Logic: Find current active schedule, or next upcoming schedule
-    // Add a 5-minute (300,000 ms) look-ahead buffer so operators can prepare for the next session
-    const currentMs = (now.getHours() * 3600000) + (now.getMinutes() * 60000) + (5 * 60000);
+    // Logic: Find current active schedule, or next upcoming schedule (within 5 minutes)
+    const currentMs = (now.getHours() * 3600000) + (now.getMinutes() * 60000);
     
     let matched = null;
     
@@ -488,23 +510,27 @@ studioSelect.addEventListener('change', () => {
         const startMs = (parseInt(startParts[0]) * 3600000) + (parseInt(startParts[1]) * 60000);
         const endMs = (parseInt(endParts[0]) * 3600000) + (parseInt(endParts[1]) * 60000);
         
-        // If effective current time is before the end of this schedule, pick this one
-        if (currentMs < endMs) {
+        // Jika sekarang >= (Jam Mulai - 5 menit) DAN sekarang <= Jam Selesai
+        if (currentMs >= (startMs - 300000) && currentMs <= endMs) {
             matched = sched;
             break;
         }
     }
     
-    // If all schedules have passed, pick the last one of the day
-    if (!matched) {
-        matched = todaySchedules[todaySchedules.length - 1];
+    if (matched) {
+        activeSchedule = matched;
+        infoHost.textContent = matched.hostName;
+        infoBrand.textContent = matched.brand;
+        infoDate.textContent = matched.date || todayStr;
+        infoTime.textContent = `${matched.startTime} - ${matched.endTime}`;
+    } else {
+        // Kosong / Standby (Realtime)
+        activeSchedule = null;
+        infoHost.textContent = "Standby (No Live Schedule)";
+        infoBrand.textContent = "-";
+        infoDate.textContent = todayStr;
+        infoTime.textContent = "-";
     }
-    
-    activeSchedule = matched;
-    infoHost.textContent = matched.hostName;
-    infoBrand.textContent = matched.brand;
-    infoDate.textContent = matched.date || "-";
-    infoTime.textContent = `${matched.startTime} - ${matched.endTime}`;
 });
 
 
@@ -584,6 +610,21 @@ btnStart.addEventListener('click', async () => {
             speaking_pct: Math.round((stats.speaking_seconds / Math.max(1, stats.total_duration_seconds)) * 100)
         };
         localStorage.setItem('orca_backup_session', JSON.stringify(logData));
+        
+        // Auto-Stop Check: 15 minutes past schedule end
+        if (activeSchedule && activeSchedule.endTime) {
+            const now = new Date();
+            const currentMs = (now.getHours() * 3600000) + (now.getMinutes() * 60000);
+            const endParts = activeSchedule.endTime.split(':');
+            const endMs = (parseInt(endParts[0]) * 3600000) + (parseInt(endParts[1]) * 60000);
+            
+            // 15 minutes = 900000 ms
+            if (currentMs >= endMs + 900000) {
+                console.log("[Auto-Stop] Session exceeded 15 minutes past schedule end.");
+                window._isAutoStop = true;
+                btnStop.click();
+            }
+        }
     }, 5000);
 
     // Lock form
@@ -670,7 +711,16 @@ btnStop.addEventListener('click', async () => {
     statNotFacing.textContent = '0s';
     statOffFrame.textContent = '0s';
 
-    alert('Sesi selesai! Data telah ditambahkan ke Log Cloud.');
+    let msg = 'Sesi ditutup secara manual oleh operator. Data telah aman disimpan ke Cloud.';
+    if (window._isAutoStop) {
+        msg = 'Sesi ini dihentikan OTOMATIS karena melewati batas toleransi 15 menit dari jadwal. Data telah diamankan.';
+        window._isAutoStop = false; // reset
+    }
+    
+    document.getElementById('endSessionMessage').textContent = msg;
+    const endModal = new bootstrap.Modal(document.getElementById('endSessionModal'));
+    endModal.show();
+    lucide.createIcons();
 });
 
 // Camera switch
