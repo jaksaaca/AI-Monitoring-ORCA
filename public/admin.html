@@ -139,9 +139,14 @@
 
             <!-- Table Card -->
             <div class="card shadow-sm flex-grow-1 min-h-0">
-                <div class="card-header bg-transparent border-secondary py-3 d-flex align-items-center gap-2">
-                    <i data-lucide="table" class="icon-md text-secondary"></i>
-                    <h6 class="mb-0 fw-semibold">Current Schedule Database</h6>
+                <div class="card-header bg-transparent border-secondary py-3 d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <i data-lucide="table" class="icon-md text-secondary"></i>
+                        <h6 class="mb-0 fw-semibold">Current Schedule Database</h6>
+                    </div>
+                    <button id="btn-add-schedule" class="btn btn-outline-success btn-sm d-none d-flex align-items-center gap-2">
+                        <i data-lucide="plus" class="icon-sm"></i> Add Schedule
+                    </button>
                 </div>
                 <div class="card-body p-0 overflow-auto">
                     <table class="table table-dark table-hover table-bordered mb-0 align-middle text-nowrap" id="schedule-table">
@@ -152,6 +157,7 @@
                                 <th class="fw-medium text-secondary">Brand</th>
                                 <th class="fw-medium text-secondary">Platform</th>
                                 <th class="fw-medium text-secondary">Location</th>
+                                <th class="fw-medium text-secondary">Date</th>
                                 <th class="fw-medium text-secondary">Start Time</th>
                                 <th class="fw-medium text-secondary">End Time</th>
                                 <th class="fw-medium text-secondary text-center" style="width: 60px;">Actions</th>

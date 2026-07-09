@@ -31,6 +31,7 @@ async function loadSchedule() {
         const branch = adminBranch.value;
         const organization = adminOrganization.value;
         scheduleData = await getSchedule(branch, organization);
+        sortScheduleData();
         renderTable();
         if (scheduleData.length > 0) {
             btnSave.classList.remove('d-none');
@@ -39,6 +40,8 @@ async function loadSchedule() {
             btnSave.classList.add('d-none');
             btnClear.classList.add('d-none');
         }
+        // Always show Add Schedule button
+        document.getElementById('btn-add-schedule').classList.remove('d-none');
     } catch (e) {
         console.warn("Could not load from Firebase:", e);
     }
@@ -73,7 +76,27 @@ fileInput.addEventListener('change', async (e) => {
             endTime = parts[1].trim();
         }
 
+        let dateValue = row['Date'] || row['Tanggal'] || row['date'] || row['tanggal'] || '';
+        // SheetJS might parse date as number, try to handle or just use string
+        if (typeof dateValue === 'number' && typeof XLSX.SSF !== 'undefined') {
+            try {
+                const parsed = XLSX.SSF.parse_date_code(dateValue);
+                if (parsed) {
+                    dateValue = `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`;
+                }
+            } catch(e) {}
+        }
+        // Basic format check if it's a string, assuming DD/MM/YYYY or DD-MM-YYYY to YYYY-MM-DD
+        if (typeof dateValue === 'string') {
+            dateValue = dateValue.trim();
+            if (dateValue.match(/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/)) {
+                const parts = dateValue.split(/[\/\-]/);
+                dateValue = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+        }
+
         return {
+            date: dateValue,
             studio: String(row['Studio'] || row['studio'] || '').trim(),
             hostName: String(row['Host'] || row['Host Name'] || row['Nama Host'] || '').trim(),
             brand: String(row['Brand'] || row['brand'] || '').trim(),
@@ -84,18 +107,33 @@ fileInput.addEventListener('change', async (e) => {
         };
     });
 
+    sortScheduleData();
     renderTable();
     btnSave.classList.remove('d-none');
     btnClear.classList.remove('d-none');
+    document.getElementById('btn-add-schedule').classList.remove('d-none');
     
     // Reset input
     fileInput.value = '';
 });
 
+// Sort Schedule Data by Date then Start Time
+function sortScheduleData() {
+    scheduleData.sort((a, b) => {
+        const dateA = a.date || '9999-12-31';
+        const dateB = b.date || '9999-12-31';
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+        
+        const timeA = a.startTime || '99:99';
+        const timeB = b.startTime || '99:99';
+        return timeA.localeCompare(timeB);
+    });
+}
+
 // Render Table with editable inputs
 function renderTable() {
     if (scheduleData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No schedule loaded. Upload an Excel file.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-secondary);">No schedule loaded. Upload an Excel file or add manually.</td></tr>';
         return;
     }
 
@@ -107,9 +145,10 @@ function renderTable() {
             <td><input type="text" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.hostName}" data-idx="${index}" data-field="hostName"></td>
             <td><input type="text" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.brand}" data-idx="${index}" data-field="brand"></td>
             <td><input type="text" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.platform || ''}" data-idx="${index}" data-field="platform"></td>
-            <td><input type="text" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.location}" data-idx="${index}" data-field="location"></td>
-            <td><input type="time" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.startTime}" data-idx="${index}" data-field="startTime"></td>
-            <td><input type="time" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.endTime}" data-idx="${index}" data-field="endTime"></td>
+            <td><input type="text" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.location || ''}" data-idx="${index}" data-field="location"></td>
+            <td><input type="date" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.date || ''}" data-idx="${index}" data-field="date"></td>
+            <td><input type="time" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.startTime || ''}" data-idx="${index}" data-field="startTime"></td>
+            <td><input type="time" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.endTime || ''}" data-idx="${index}" data-field="endTime"></td>
             <td class="text-center">
                 <button class="btn btn-outline-danger btn-sm" onclick="deleteRow(${index})">
                     <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
@@ -137,12 +176,40 @@ window.deleteRow = function(index) {
     renderTable();
 };
 
+const btnAddSchedule = document.getElementById('btn-add-schedule');
+if (btnAddSchedule) {
+    btnAddSchedule.addEventListener('click', () => {
+        scheduleData.push({
+            date: '',
+            studio: '',
+            hostName: '',
+            brand: '',
+            platform: '',
+            location: '',
+            startTime: '',
+            endTime: ''
+        });
+        renderTable();
+        
+        // Show save buttons if they were hidden
+        btnSave.classList.remove('d-none');
+        btnClear.classList.remove('d-none');
+        
+        // Scroll to bottom
+        tbody.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    });
+}
+
 // Save to Database (Firebase)
 btnSave.addEventListener('click', async () => {
+    // Re-sort before saving
+    sortScheduleData();
+    renderTable();
+
     // Validate
-    const invalid = scheduleData.some(r => !r.studio || !r.hostName || !r.startTime || !r.endTime);
+    const invalid = scheduleData.some(r => !r.studio || !r.hostName || !r.date || !r.startTime || !r.endTime);
     if (invalid) {
-        alert('Error: Please ensure all rows have at least Studio, Host Name, Start Time, and End Time filled.');
+        alert('Error: Please ensure all rows have at least Studio, Host Name, Date, Start Time, and End Time filled.');
         return;
     }
     

@@ -377,6 +377,7 @@ let unsubscribeStudioStatus = null;
 const studioSelect = document.getElementById('studio');
 const infoHost = document.getElementById('info-host');
 const infoBrand = document.getElementById('info-brand');
+const infoDate = document.getElementById('info-date');
 const infoTime = document.getElementById('info-time');
 
 function populateStudios() {
@@ -399,6 +400,7 @@ function populateStudios() {
         studioSelect.innerHTML = '<option value="" disabled selected>No Schedule Uploaded for ' + currentBranch + '</option>';
         infoHost.textContent = "-";
         infoBrand.textContent = "-";
+        infoDate.textContent = "-";
         infoTime.textContent = "-";
         activeSchedule = null;
     }
@@ -421,6 +423,7 @@ studioSelect.addEventListener('change', () => {
     if (studioSchedules.length === 0) {
         infoHost.textContent = "No Schedule Found";
         infoBrand.textContent = "-";
+        infoDate.textContent = "-";
         infoTime.textContent = "-";
         activeSchedule = null;
         return;
@@ -458,6 +461,7 @@ studioSelect.addEventListener('change', () => {
     activeSchedule = matched;
     infoHost.textContent = matched.hostName;
     infoBrand.textContent = matched.brand;
+    infoDate.textContent = matched.date || "-";
     infoTime.textContent = `${matched.startTime} - ${matched.endTime}`;
 });
 
@@ -527,7 +531,7 @@ btnStop.addEventListener('click', async () => {
     const logData = {
         branch: currentBranch,
         organization: activeSchedule.organization || 'Unknown',
-        dateDay: new Date().toLocaleDateString('en-GB'),
+        dateDay: activeSchedule.date || new Date().toLocaleDateString('en-GB'),
         lsTime: `${activeSchedule.startTime} - ${activeSchedule.endTime}`,
         host_name: activeSchedule.hostName,
         brand: activeSchedule.brand,

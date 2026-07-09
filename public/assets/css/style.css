@@ -256,3 +256,58 @@ select option {
     opacity: 0;
     pointer-events: none;
 }
+
+/* ================================================
+   RESPONSIVE: Mobile & Tablet Camera Preview
+   On small screens, camera preview stays visible
+   at the top while controls scroll below it.
+   ================================================ */
+@media (max-width: 991.98px) {
+    /* Camera column sticks to top on mobile */
+    .order-1.col-lg-9 {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background-color: var(--theme-bg);
+        padding-bottom: 0.5rem !important;
+    }
+
+    /* Fixed height for camera on mobile */
+    .camera-container {
+        min-height: 220px;
+        max-height: 280px;
+        flex-grow: 0 !important;
+    }
+
+    /* Stats row: horizontal scroll on mobile */
+    .order-1.col-lg-9 > .row.g-3 {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+    }
+    .order-1.col-lg-9 > .row.g-3 > .col {
+        min-width: 120px;
+        flex: 0 0 auto;
+    }
+    .order-1.col-lg-9 > .row.g-3 .card-body h4 {
+        font-size: 1rem;
+    }
+
+    /* Allow sidebar to scroll naturally below */
+    .order-2.col-lg-3 {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    /* Badges: smaller on mobile */
+    .live-status-overlay {
+        gap: 0.25rem;
+        top: 0.5rem;
+        left: 0.5rem;
+    }
+    .live-status-overlay .badge {
+        font-size: 0.65rem;
+        padding: 0.25rem 0.4rem;
+    }
+}

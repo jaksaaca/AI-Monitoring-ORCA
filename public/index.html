@@ -71,11 +71,11 @@
         </nav>
 
         <!-- Main Content -->
-        <div class="container-fluid flex-grow-1 p-4 overflow-hidden">
+        <div class="container-fluid flex-grow-1 p-4 overflow-auto">
             <div class="row h-100 g-4">
                 
-                <!-- Left Sidebar (Controls) -->
-                <div class="col-lg-3 d-flex flex-column gap-4 overflow-auto h-100 pb-2">
+                <!-- Left Sidebar (Controls) — On mobile: appears BELOW camera -->
+                <div class="col-lg-3 d-flex flex-column gap-4 overflow-auto h-100 pb-2 order-2 order-lg-1">
                     
                     <!-- Setup Session Card -->
                     <div class="card shadow-sm">
@@ -99,6 +99,10 @@
                                 <div class="d-flex justify-content-between mb-2 small">
                                     <span class="text-secondary">Brand</span>
                                     <span id="info-brand" class="fw-medium text-end">-</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2 small">
+                                    <span class="text-secondary">Date</span>
+                                    <span id="info-date" class="fw-medium text-end">-</span>
                                 </div>
                                 <div class="d-flex justify-content-between small">
                                     <span class="text-secondary">Schedule</span>
@@ -145,8 +149,8 @@
                     </div>
                 </div>
 
-                <!-- Right Column (Camera & Stats) -->
-                <div class="col-lg-9 d-flex flex-column h-100">
+                <!-- Right Column (Camera & Stats) — On mobile: appears FIRST -->
+                <div class="col-lg-9 d-flex flex-column h-100 order-1 order-lg-2">
                     
                     <!-- Camera Container -->
                     <div class="camera-container rounded shadow-sm border border-secondary flex-grow-1">
