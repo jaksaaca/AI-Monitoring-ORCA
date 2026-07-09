@@ -524,8 +524,8 @@ btnStart.addEventListener('click', async () => {
     const studioName = activeSchedule.studio;
     const statusData = currentStudioStatuses[studioName];
     if (statusData && statusData.status === 'active') {
-        alert(`ACCESS DENIED: Studio [${studioName}] is currently IN USE by another operator!`);
-        return;
+        const force = confirm(`WARNING: Studio [${studioName}] is currently IN USE by another operator!\n\nDo you want to FORCE TAKE OVER this studio? (Hanya gunakan jika studio tersangkut / error)`);
+        if (!force) return;
     }
 
     const meta = {
@@ -719,11 +719,13 @@ function updateStudioDropdown() {
         if (!opt.value) return; // skip placeholder
         const statusData = currentStudioStatuses[opt.value];
         if (statusData && statusData.status === 'active') {
-            opt.disabled = true;
+            opt.disabled = false; // Allow selection for force takeover
             opt.textContent = `${opt.value} (IN USE)`;
+            opt.style.color = '#dc3545'; // text-danger
         } else {
             opt.disabled = false;
             opt.textContent = opt.value;
+            opt.style.color = '';
         }
     });
 }
