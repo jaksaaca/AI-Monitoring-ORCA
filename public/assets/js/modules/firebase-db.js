@@ -8,7 +8,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { 
     getFirestore, collection, doc, setDoc, getDoc, getDocs, 
-    addDoc, deleteDoc, query, where, orderBy, onSnapshot, limit, limit
+    addDoc, deleteDoc, query, where, orderBy, onSnapshot, limit
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ==========================================
