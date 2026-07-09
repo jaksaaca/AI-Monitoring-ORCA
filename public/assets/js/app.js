@@ -429,17 +429,35 @@ studioSelect.addEventListener('change', () => {
         return;
     }
 
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    
+    // Filter schedules for TODAY
+    const todaySchedules = studioSchedules.filter(s => {
+        // If date is provided, it must match today's date
+        // If date is empty, we assume it's a generic daily template
+        return !s.date || s.date === todayStr;
+    });
+
+    if (todaySchedules.length === 0) {
+        infoHost.textContent = "No Schedule for Today";
+        infoBrand.textContent = "-";
+        infoDate.textContent = todayStr;
+        infoTime.textContent = "-";
+        activeSchedule = null;
+        return;
+    }
+
     // Sort by start time
-    studioSchedules.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    todaySchedules.sort((a, b) => a.startTime.localeCompare(b.startTime));
     
     // Logic: Find current active schedule, or next upcoming schedule
-    const now = new Date();
     // Add a 5-minute (300,000 ms) look-ahead buffer so operators can prepare for the next session
     const currentMs = (now.getHours() * 3600000) + (now.getMinutes() * 60000) + (5 * 60000);
     
     let matched = null;
     
-    for (const sched of studioSchedules) {
+    for (const sched of todaySchedules) {
         // Parse "HH:MM"
         const startParts = sched.startTime.split(':');
         const endParts = sched.endTime.split(':');
@@ -453,9 +471,9 @@ studioSelect.addEventListener('change', () => {
         }
     }
     
-    // If all schedules have passed, pick the last one
+    // If all schedules have passed, pick the last one of the day
     if (!matched) {
-        matched = studioSchedules[studioSchedules.length - 1];
+        matched = todaySchedules[todaySchedules.length - 1];
     }
     
     activeSchedule = matched;
