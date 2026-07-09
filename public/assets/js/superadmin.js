@@ -1,4 +1,4 @@
-import { getAllSessionLogs, getAllUsers, createUser, deleteUser } from "./modules/firebase-db.js";
+import { getAllSessionLogs, getAllUsers, createUser, deleteUser, deleteSessionLog } from "./modules/firebase-db.js";
 
 // Check Auth
 const authData = JSON.parse(sessionStorage.getItem('orca_auth'));
@@ -82,7 +82,7 @@ function renderLogs() {
     matchCount.textContent = filteredLogs.length;
 
     if (filteredLogs.length === 0) {
-        tbodyLogs.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-secondary">No sessions match the selected filters.</td></tr>`;
+        tbodyLogs.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-secondary">No sessions match the selected filters.</td></tr>`;
         return;
     }
 
@@ -98,9 +98,31 @@ function renderLogs() {
             <td>${l.total_duration_seconds}s</td>
             <td class="${l.face_detected_pct < 50 ? 'text-danger' : 'text-success'}">${l.face_detected_pct}%</td>
             <td class="${l.speaking_pct < 20 ? 'text-warning' : 'text-success'}">${l.speaking_pct}%</td>
+            <td class="text-end pe-4">
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteLog('${l.id}')" title="Delete Log">
+                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                </button>
+            </td>
         </tr>
     `).join('');
+    lucide.createIcons();
 }
+
+window.deleteLog = async (id) => {
+    if (confirm("Are you sure you want to permanently delete this session log? This cannot be undone.")) {
+        const btn = document.querySelector(`button[onclick="deleteLog('${id}')"]`);
+        if (btn) btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        
+        try {
+            await deleteSessionLog(id);
+            // Remove from local array to avoid refetching
+            allLogs = allLogs.filter(l => l.id !== id);
+            renderLogs();
+        } catch (e) {
+            alert("Failed to delete log: " + e.message);
+        }
+    }
+};
 
 if(fBranch) fBranch.addEventListener('change', renderLogs);
 if(fOrganization) fOrganization.addEventListener('change', renderLogs);

@@ -171,9 +171,18 @@ export async function setStudioStatus(branch, studio, statusData) {
             ...statusData,
             updatedAt: new Date().getTime()
         }, { merge: true });
-        return true;
     } catch (e) {
-        console.error("Error setting studio status:", e);
-        return false;
+        console.error("Error setting studio status: ", e);
+        throw e;
+    }
+}
+
+export async function deleteSessionLog(docId) {
+    try {
+        const docRef = doc(db, "sessions", docId);
+        await deleteDoc(docRef);
+    } catch (e) {
+        console.error("Error deleting session log: ", e);
+        throw e;
     }
 }

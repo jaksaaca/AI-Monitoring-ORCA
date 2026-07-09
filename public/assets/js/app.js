@@ -80,6 +80,7 @@ let currentStream    = null;
 let isSessionActive  = false;
 let currentPoseClass = 'Depan';
 let currentFaceDetected = false;
+let backupInterval = null;
 
 // Frame skipping — process AI every N frames for performance
 const AI_FRAME_SKIP  = 5; // default balanced
@@ -103,6 +104,27 @@ async function initialize() {
             branchModalInstance.show();
         } else {
             document.getElementById('system-status-text').textContent = `System Ready (${currentBranch})`;
+            
+            // Auto-Release Dangling Studio Status (if page was refreshed)
+            const danglingStudio = sessionStorage.getItem('orca_active_studio');
+            if (danglingStudio) {
+                setStudioStatus(currentBranch, danglingStudio, { status: 'idle' }).catch(console.error);
+                sessionStorage.removeItem('orca_active_studio');
+                console.log(`[Auto-Release] Studio ${danglingStudio} released after refresh.`);
+            }
+
+            // Auto-Upload Disrupted Session (if page was refreshed/crashed during session)
+            const backupSession = localStorage.getItem('orca_backup_session');
+            if (backupSession) {
+                try {
+                    const logData = JSON.parse(backupSession);
+                    saveSessionLog(logData).catch(console.error);
+                    localStorage.removeItem('orca_backup_session');
+                    console.log("[Auto-Save] Successfully uploaded disrupted session log.");
+                } catch (e) {
+                    console.error("Failed to parse backup session", e);
+                }
+            }
         }
 
         setLoadingProgress(5, 'Initializing ONNX Runtime...');
@@ -526,6 +548,41 @@ btnStart.addEventListener('click', async () => {
 
     Session.startSession(meta);
     isSessionActive = true;
+    
+    // Auto-Release Tracker
+    sessionStorage.setItem('orca_active_studio', studioName);
+    
+    // Auto-Save Interval (Backup every 5 seconds in case of crash)
+    if (backupInterval) clearInterval(backupInterval);
+    backupInterval = setInterval(() => {
+        const stats = Session.getStats();
+        const logData = {
+            branch: currentBranch,
+            organization: activeSchedule.organization || 'Unknown',
+            dateDay: activeSchedule.date || new Date().toLocaleDateString('en-GB'),
+            lsTime: `${activeSchedule.startTime} - ${activeSchedule.endTime}`,
+            host_name: activeSchedule.hostName,
+            brand: activeSchedule.brand,
+            platform: activeSchedule.platform || '-',
+            studio_id: activeSchedule.studio,
+            location: activeSchedule.location,
+            program_schedule: activeSchedule.startTime,
+            total_duration_seconds: stats.total_duration_seconds,
+            face_detected_seconds: stats.face_detected_seconds,
+            face_detected_pct: Math.round((stats.face_detected_seconds / Math.max(1, stats.total_duration_seconds)) * 100),
+            facing_camera_seconds: stats.facing_camera_seconds,
+            facing_camera_pct: Math.round((stats.facing_camera_seconds / Math.max(1, stats.total_duration_seconds)) * 100),
+            head_down_seconds: stats.head_down_seconds,
+            head_down_pct: Math.round((stats.head_down_seconds / Math.max(1, stats.total_duration_seconds)) * 100),
+            not_facing_seconds: stats.not_facing_seconds,
+            not_facing_pct: Math.round((stats.not_facing_seconds / Math.max(1, stats.total_duration_seconds)) * 100),
+            off_frame_seconds: stats.off_frame_seconds,
+            off_frame_pct: Math.round((stats.off_frame_seconds / Math.max(1, stats.total_duration_seconds)) * 100),
+            speaking_seconds: stats.speaking_seconds,
+            speaking_pct: Math.round((stats.speaking_seconds / Math.max(1, stats.total_duration_seconds)) * 100)
+        };
+        localStorage.setItem('orca_backup_session', JSON.stringify(logData));
+    }, 5000);
 
     // Lock form
     btnStart.disabled = true;
@@ -577,6 +634,11 @@ btnStop.addEventListener('click', async () => {
     } catch (e) {
         alert("Warning: Could not save session log to cloud.\nError: " + e.message);
     }
+    
+    // Clear backups since it saved successfully
+    if (backupInterval) clearInterval(backupInterval);
+    localStorage.removeItem('orca_backup_session');
+    sessionStorage.removeItem('orca_active_studio');
 
     // Release Studio
     await setStudioStatus(currentBranch, activeSchedule.studio, {
