@@ -26,6 +26,8 @@ const matchCount = document.getElementById('match-count');
 const btnDownload = document.getElementById('btn-download');
 
 let allLogs = [];
+let currentPage = 1;
+const itemsPerPage = 50;
 let filteredLogs = [];
 
 async function loadAnalytics() {
@@ -79,14 +81,23 @@ function renderLogs() {
         return mBranch && mOrg && mStudio && mBrand && mPlatform && mHost;
     });
 
+    
     matchCount.textContent = filteredLogs.length;
 
     if (filteredLogs.length === 0) {
-        tbodyLogs.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-secondary">No sessions match the selected filters.</td></tr>`;
+        tbodyLogs.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-secondary">No sessions match the selected filters.</td></tr>`;
+        document.getElementById('pagination-info').textContent = "Showing 0 of 0 entries";
+        document.getElementById('pagination-ul').innerHTML = "";
         return;
     }
 
-    tbodyLogs.innerHTML = filteredLogs.map(l => `
+    const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+    if (currentPage > totalPages) currentPage = 1;
+    
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedLogs = filteredLogs.slice(startIndex, startIndex + itemsPerPage);
+
+    tbodyLogs.innerHTML = paginatedLogs.map(l => `
         <tr>
             <td class="ps-4">${l.timestamp ? new Date(l.timestamp).toLocaleString() : l['dateDay'] || '-'}</td>
             <td><span class="badge bg-secondary">${l.branch || '-'}</span></td>
@@ -106,7 +117,61 @@ function renderLogs() {
         </tr>
     `).join('');
     lucide.createIcons();
+    
+    const endCount = Math.min(startIndex + itemsPerPage, filteredLogs.length);
+    document.getElementById('pagination-info').textContent = `Showing ${startIndex + 1} to ${endCount} of ${filteredLogs.length} entries`;
+    renderPagination(totalPages);
 }
+
+
+
+function renderPagination(totalPages) {
+    const ul = document.getElementById('pagination-ul');
+    let html = '';
+    
+    html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <button class="page-link" onclick="changePage(${currentPage - 1})">Prev</button>
+             </li>`;
+             
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <button class="page-link" onclick="changePage(${i})">${i}</button>
+                 </li>`;
+    }
+    
+    html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <button class="page-link" onclick="changePage(${currentPage + 1})">Next</button>
+             </li>`;
+             
+    ul.innerHTML = html;
+}
+
+window.changePage = (page) => {
+    currentPage = page;
+    renderLogs();
+};
+
+document.getElementById('btn-fetch-data').addEventListener('click', async () => {
+    const sDate = document.getElementById('fetch-start-date').value;
+    const eDate = document.getElementById('fetch-end-date').value;
+    const btn = document.getElementById('btn-fetch-data');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Fetching...';
+    btn.disabled = true;
+    try {
+        allLogs = await getAllSessionLogs(sDate || null, eDate || null);
+        populateFilters();
+        currentPage = 1;
+        renderLogs();
+    } catch (e) {
+        alert("Failed to fetch data: " + e.message);
+    }
+    btn.innerHTML = '<i data-lucide="database-zap" style="width: 16px;"></i> Tarik Data';
+    btn.disabled = false;
+    lucide.createIcons();
+});
 
 window.deleteLog = async (id) => {
     if (confirm("Are you sure you want to permanently delete this session log? This cannot be undone.")) {
@@ -124,9 +189,9 @@ window.deleteLog = async (id) => {
     }
 };
 
-if(fBranch) fBranch.addEventListener('change', renderLogs);
-if(fOrganization) fOrganization.addEventListener('change', renderLogs);
-[fStudio, fBrand, fPlatform, fHost].forEach(el => el.addEventListener('change', renderLogs));
+if(fBranch) fBranch.addEventListener('change', () => { currentPage = 1; renderLogs(); });
+if(fOrganization) fOrganization.addEventListener('change', () => { currentPage = 1; renderLogs(); });
+[fStudio, fBrand, fPlatform, fHost].forEach(el => el.addEventListener('change', () => { currentPage = 1; renderLogs(); }));
 
 // Export CSV
 btnDownload.addEventListener('click', () => {

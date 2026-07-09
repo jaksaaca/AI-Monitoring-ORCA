@@ -8,7 +8,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { 
     getFirestore, collection, doc, setDoc, getDoc, getDocs, 
-    addDoc, deleteDoc, query, where, orderBy, onSnapshot 
+    addDoc, deleteDoc, query, where, orderBy, onSnapshot, limit, limit
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ==========================================
@@ -135,9 +135,14 @@ export async function saveSessionLog(logData) {
     await addDoc(collection(db, "sessions"), logData);
 }
 
-export async function getAllSessionLogs() {
-    // Get all sessions, sorted by timestamp descending
-    const q = query(collection(db, "sessions"), orderBy("timestamp", "desc"));
+export async function getAllSessionLogs(startDate = null, endDate = null) {
+    let qArgs = [collection(db, "sessions")];
+    if (startDate) qArgs.push(where("timestamp", ">=", startDate + "T00:00:00.000Z"));
+    if (endDate) qArgs.push(where("timestamp", "<=", endDate + "T23:59:59.999Z"));
+    qArgs.push(orderBy("timestamp", "desc"));
+    qArgs.push(limit(1000));
+    
+    const q = query(...qArgs);
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }

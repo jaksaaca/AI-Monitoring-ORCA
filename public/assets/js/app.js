@@ -207,10 +207,12 @@ async function startCamera(deviceId = null) {
         currentStream.getTracks().forEach(t => t.stop());
     }
 
+    // Request high resolution without forcing a landscape aspect ratio,
+    // so portrait OBS Virtual Cameras (9:16) won't be padded with black bars internally.
     const constraints = {
         video: deviceId
-            ? { deviceId: { exact: deviceId }, width: { ideal: 640 } }
-            : { facingMode: 'user', width: { ideal: 640 } },
+            ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1920 } }
+            : { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1920 } },
         audio: false
     };
 
@@ -631,13 +633,14 @@ btnStop.addEventListener('click', async () => {
 
     try {
         await saveSessionLog(logData);
+        // Clear backups only if saved successfully
+        localStorage.removeItem('orca_backup_session');
     } catch (e) {
-        alert("Warning: Could not save session log to cloud.\nError: " + e.message);
+        alert("Warning: Could not save session log to cloud.\nError: " + e.message + "\n\nData has been saved locally and will be uploaded when you refresh the page.");
     }
     
-    // Clear backups since it saved successfully
+    // Always stop the interval and clear active studio state so UI can reset
     if (backupInterval) clearInterval(backupInterval);
-    localStorage.removeItem('orca_backup_session');
     sessionStorage.removeItem('orca_active_studio');
 
     // Release Studio
