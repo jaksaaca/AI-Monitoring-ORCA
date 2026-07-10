@@ -350,15 +350,29 @@ function updateVadMeter() {
     }
 }
 
+let consecutiveFaceFails = 0;
+const MAX_FAILS_BEFORE_LOST = 3; // LITE OPTIMIZATION: Grace period (3 * 10 frames = 1 second) before dropping face
+
 async function processAI(timestamp) {
     // Step 1: Face Detection
     const faces = FaceDetector.detect(videoEl, timestamp);
-    lastFaces = faces;
-    currentFaceDetected = faces.length > 0;
+    
+    // Smoothing / Hysteresis logic to prevent flickering ("copot pasang")
+    if (faces.length > 0) {
+        lastFaces = faces;
+        currentFaceDetected = true;
+        consecutiveFaceFails = 0; // Reset fail counter
+    } else {
+        consecutiveFaceFails++;
+        if (consecutiveFaceFails >= MAX_FAILS_BEFORE_LOST) {
+            currentFaceDetected = false;
+            lastFaces = [];
+        }
+    }
 
     // Step 2: Gaze Classification (only if face found)
-    if (currentFaceDetected && GazeClassifier.isReady()) {
-        const result = await GazeClassifier.classify(videoEl, faces[0]);
+    if (currentFaceDetected && GazeClassifier.isReady() && lastFaces.length > 0) {
+        const result = await GazeClassifier.classify(videoEl, lastFaces[0]);
         currentPoseClass = result.class;
     } else if (!currentFaceDetected) {
         currentPoseClass = 'Depan'; // Reset when no face
