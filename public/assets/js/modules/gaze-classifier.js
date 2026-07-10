@@ -69,7 +69,7 @@ export async function classify(source, faceBox) {
         // --- CONFIGURATION ---
         // SENSITIVITAS "Nunduk" (Bawah). Range 0.0 - 1.0
         // Semakin KECIL angkanya, semakin GAMPANG/SENSITIF AI mendeteksi nunduk.
-        const SENSITIVITAS_NUNDUK = 0.25;
+        const SENSITIVITAS_NUNDUK = 0.15;
 
         // Step 3: Calculate probabilities for all classes (Softmax)
         let maxLogit = logits[0];
