@@ -83,7 +83,7 @@ let currentFaceDetected = false;
 let backupInterval = null;
 
 // Frame skipping — process AI every N frames for performance
-const AI_FRAME_SKIP  = 5; // default balanced
+const AI_FRAME_SKIP = 10; // LITE OPTIMIZATION: Process 1 in every 10 frames // default balanced
 const currentVideoWidth = 1280;
 const currentVideoHeight = 720;
 let frameCount       = 0;

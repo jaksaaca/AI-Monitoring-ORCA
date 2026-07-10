@@ -1,45 +1,48 @@
 /**
  * ================================================
  *  ORCA Host Monitoring — Face Detector Module
- *  Wrapper for MediaPipe Tasks Vision FaceDetector.
- *  Runs face detection in the browser using WASM.
+ *  (UPGRADED: FaceLandmarker Lite Version)
  *  Author: Jaksa Setia Alam
  * ================================================
  */
 
-let faceDetector = null;
+let faceLandmarker = null;
 let _isReady = false;
 
 // MediaPipe Tasks Vision CDN paths
 const VISION_WASM_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
-const FACE_MODEL_CDN = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite';
+const FACE_MODEL_CDN = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 
 /**
- * Initialize the MediaPipe FaceDetector.
+ * Initialize the MediaPipe FaceLandmarker.
  * @param {function} onProgress — callback for loading status updates
  * @returns {Promise<void>}
  */
 export async function init(onProgress) {
     if (_isReady) return;
 
-    onProgress?.('Loading face detection model...');
+    onProgress?.('Loading Face Landmarker model...');
 
     // Dynamically import MediaPipe Tasks Vision
     const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+    const { FaceLandmarker, FilesetResolver } = vision;
 
-    const { FaceDetector, FilesetResolver } = vision;
-
-    onProgress?.('Initializing face detection WASM runtime...');
+    onProgress?.('Initializing WASM runtime...');
     const filesetResolver = await FilesetResolver.forVisionTasks(VISION_WASM_CDN);
 
-    onProgress?.('Creating face detector...');
-    faceDetector = await FaceDetector.createFromOptions(filesetResolver, {
+    onProgress?.('Creating Face Landmarker (Lite)...');
+    faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
         baseOptions: {
             modelAssetPath: FACE_MODEL_CDN,
             delegate: 'GPU'  // Use WebGL for better performance
         },
         runningMode: 'VIDEO',
-        minDetectionConfidence: 0.2,
+        numFaces: 1, // LITE OPTIMIZATION 1: Only track 1 face, ignore others
+        minFaceDetectionConfidence: 0.2, // High sensitivity for long range
+        minFacePresenceConfidence: 0.2,
+        minTrackingConfidence: 0.2,
+        outputFaceBlendshapes: false, // LITE OPTIMIZATION: Disable heavy 3D blendshapes
+        outputFacialTransformationMatrixes: false // Disable heavy matrices
     });
 
     _isReady = true;
@@ -54,38 +57,54 @@ export async function init(onProgress) {
  *          Array of face bounding boxes in video pixel coordinates.
  */
 export function detect(videoElement, timestamp) {
-    if (!_isReady || !faceDetector) return [];
+    if (!_isReady || !faceLandmarker) return [];
 
     try {
-        const result = faceDetector.detectForVideo(videoElement, timestamp);
-        if (!result || !result.detections || result.detections.length === 0) {
+        const result = faceLandmarker.detectForVideo(videoElement, timestamp);
+        if (!result || !result.faceLandmarks || result.faceLandmarks.length === 0) {
             return [];
         }
 
         const vw = videoElement.videoWidth;
         const vh = videoElement.videoHeight;
 
-        return result.detections.map(det => {
-            const bbox = det.boundingBox;
-            // Add margin (20% on each side, matching Python version)
-            const marginX = bbox.width * 0.2;
-            const marginY = bbox.height * 0.2;
+        // LITE OPTIMIZATION 3: Convert 478 3D points back to a simple 2D Bounding Box
+        return result.faceLandmarks.map(landmarks => {
+            let minX = 1, maxX = 0, minY = 1, maxY = 0;
+            
+            // Find boundaries
+            for (let i = 0; i < landmarks.length; i++) {
+                if (landmarks[i].x < minX) minX = landmarks[i].x;
+                if (landmarks[i].x > maxX) maxX = landmarks[i].x;
+                if (landmarks[i].y < minY) minY = landmarks[i].y;
+                if (landmarks[i].y > maxY) maxY = landmarks[i].y;
+            }
 
-            const x = Math.max(0, bbox.originX - marginX);
-            const y = Math.max(0, bbox.originY - marginY);
-            const w = Math.min(vw - x, bbox.width + marginX * 2);
-            const h = Math.min(vh - y, bbox.height + marginY * 2);
+            // Convert normalized coordinates [0.0 - 1.0] to pixels
+            const originX = minX * vw;
+            const originY = minY * vh;
+            const rawWidth = (maxX - minX) * vw;
+            const rawHeight = (maxY - minY) * vh;
+
+            // Add margin (20% on each side) to match old FaceDetector behavior
+            const marginX = rawWidth * 0.2;
+            const marginY = rawHeight * 0.2;
+
+            const x = Math.max(0, originX - marginX);
+            const y = Math.max(0, originY - marginY);
+            const w = Math.min(vw - x, rawWidth + marginX * 2);
+            const h = Math.min(vh - y, rawHeight + marginY * 2);
 
             return {
                 x: Math.round(x),
                 y: Math.round(y),
                 width: Math.round(w),
                 height: Math.round(h),
-                confidence: det.categories?.[0]?.score || 0
+                confidence: 1 // Landmarker assumes confidence is high if returned
             };
         });
     } catch (e) {
-        console.warn('[FaceDetector] Detection error:', e);
+        console.warn('[FaceLandmarker] Detection error:', e);
         return [];
     }
 }
