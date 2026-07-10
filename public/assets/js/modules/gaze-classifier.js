@@ -66,22 +66,47 @@ export async function classify(source, faceBox) {
         const output = results['output'];
         const logits = output.data;
 
-        // Step 3: Find argmax (predicted class)
-        let maxIdx = 0;
-        let maxVal = logits[0];
+        // --- CONFIGURATION ---
+        // SENSITIVITAS "Nunduk" (Bawah). Range 0.0 - 1.0
+        // Semakin KECIL angkanya, semakin GAMPANG/SENSITIF AI mendeteksi nunduk.
+        const SENSITIVITAS_NUNDUK = 0.25;
+
+        // Step 3: Calculate probabilities for all classes (Softmax)
+        let maxLogit = logits[0];
         for (let i = 1; i < logits.length; i++) {
-            if (logits[i] > maxVal) {
-                maxVal = logits[i];
+            if (logits[i] > maxLogit) maxLogit = logits[i];
+        }
+
+        let expSum = 0;
+        const probs = new Float32Array(logits.length);
+        for (let i = 0; i < logits.length; i++) {
+            const val = Math.exp(logits[i] - maxLogit);
+            probs[i] = val;
+            expSum += val;
+        }
+        for (let i = 0; i < probs.length; i++) {
+            probs[i] /= expSum;
+        }
+
+        // Step 4: Find argmax (predicted class)
+        let maxIdx = 0;
+        let maxProb = probs[0];
+        for (let i = 1; i < probs.length; i++) {
+            if (probs[i] > maxProb) {
+                maxProb = probs[i];
                 maxIdx = i;
             }
         }
 
-        // Step 4: Apply softmax for confidence score
-        let expSum = 0;
-        for (let i = 0; i < logits.length; i++) {
-            expSum += Math.exp(logits[i] - maxVal); // subtract max for numerical stability
+        // --- Custom Sensitivity Logic ---
+        // Jika probabilitas 'Bawah' (index 4) mencapai batas sensitivitas (misal 25%),
+        // kita langsung paksa vonis jadi 'Bawah', tak peduli walaupun 'Depan' skornya lebih besar.
+        // Ini mengatasi model yang terlalu kebal (bias) ke depan.
+        if (probs[4] >= SENSITIVITAS_NUNDUK) {
+            maxIdx = 4;
         }
-        const confidence = 1 / expSum; // exp(0) / sum
+
+        const confidence = probs[maxIdx];
 
         let poseClass = CLASSES[maxIdx];
 
