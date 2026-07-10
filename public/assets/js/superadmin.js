@@ -25,6 +25,76 @@ const fHost = document.getElementById('filter-host');
 const matchCount = document.getElementById('match-count');
 const btnDownload = document.getElementById('btn-download');
 
+const dateRangeInput = document.getElementById('fetch-date-range');
+const btnFetchData = document.getElementById('btn-fetch-data');
+const btnResetFilters = document.getElementById('btn-reset-filters');
+
+let fpInstance = null;
+if (typeof flatpickr !== 'undefined' && dateRangeInput) {
+    fpInstance = flatpickr(dateRangeInput, {
+        mode: "range",
+        dateFormat: "Y-m-d",
+        theme: "dark"
+    });
+}
+
+if (btnFetchData) {
+    btnFetchData.addEventListener('click', async () => {
+        let start = null, end = null;
+        if (fpInstance && fpInstance.selectedDates.length === 2) {
+            start = fpInstance.selectedDates[0].toISOString().split('T')[0];
+            end = fpInstance.selectedDates[1].toISOString().split('T')[0];
+        } else if (fpInstance && fpInstance.selectedDates.length === 1) {
+            start = fpInstance.selectedDates[0].toISOString().split('T')[0];
+            end = start;
+        }
+        
+        btnFetchData.disabled = true;
+        btnFetchData.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        
+        try {
+            allLogs = await getAllSessionLogs(start, end);
+            populateFilters(true); // Re-populate based on new dataset
+            renderLogs();
+        } catch (e) {
+            console.error(e);
+            alert("Gagal menarik data dari server.");
+        } finally {
+            btnFetchData.disabled = false;
+            btnFetchData.innerHTML = '<i data-lucide="database-zap" style="width: 14px;"></i> Fetch';
+            lucide.createIcons();
+        }
+    });
+}
+
+if (btnResetFilters) {
+    btnResetFilters.addEventListener('click', async () => {
+        // Reset dropdowns
+        fBranch.value = 'all';
+        fOrganization.value = 'all';
+        fStudio.value = 'all';
+        fBrand.value = 'all';
+        fPlatform.value = 'all';
+        fHost.value = 'all';
+        
+        // Reset flatpickr
+        if (fpInstance) fpInstance.clear();
+        
+        btnResetFilters.disabled = true;
+        
+        try {
+            allLogs = await getAllSessionLogs();
+            populateFilters(true);
+            renderLogs();
+        } catch(e) {
+            console.error(e);
+        } finally {
+            btnResetFilters.disabled = false;
+        }
+    });
+}
+
+
 let allLogs = [];
 let currentPage = 1;
 const itemsPerPage = 50;
@@ -41,26 +111,64 @@ async function loadAnalytics() {
 }
 
 function populateFilters() {
-    const studios = [...new Set(allLogs.map(l => l.studio_id).filter(Boolean))].sort();
-    const brands = [...new Set(allLogs.map(l => l.brand).filter(Boolean))].sort();
-    const platforms = [...new Set(allLogs.map(l => l.platform).filter(Boolean))].sort();
-    const hosts = [...new Set(allLogs.map(l => l.host_name).filter(Boolean))].sort();
+    const selS = fStudio.value;
+    const selB = fBrand.value;
+    const selP = fPlatform.value;
+    const selH = fHost.value;
+    const selBranch = fBranch ? fBranch.value : 'all';
+    const selOrg = fOrganization ? fOrganization.value : 'all';
 
-    const createOpts = (arr, el) => {
-        // Keep the "All" option
+    const getAvailable = (filterKey, logs) => [...new Set(logs.map(l => l[filterKey]).filter(Boolean))].sort();
+
+    const createOpts = (arr, el, currentVal) => {
         el.innerHTML = el.firstElementChild.outerHTML; 
         arr.forEach(val => {
             const opt = document.createElement('option');
             opt.value = val;
             opt.textContent = val;
+            if (val === currentVal) opt.selected = true;
             el.appendChild(opt);
         });
+        if (!arr.includes(currentVal) && currentVal !== 'all') {
+            el.value = 'all';
+        }
     };
 
-    createOpts(studios, fStudio);
-    createOpts(brands, fBrand);
-    createOpts(platforms, fPlatform);
-    createOpts(hosts, fHost);
+    const logsForStudio = allLogs.filter(l => 
+        (selBranch === 'all' || (l.branch || '').toLowerCase() === selBranch.toLowerCase()) &&
+        (selOrg === 'all' || (l.organization || '').toLowerCase() === selOrg.toLowerCase()) &&
+        (selB === 'all' || l.brand === selB) && 
+        (selP === 'all' || l.platform === selP) && 
+        (selH === 'all' || l.host_name === selH)
+    );
+    createOpts(getAvailable('studio_id', logsForStudio), fStudio, selS);
+
+    const logsForBrand = allLogs.filter(l => 
+        (selBranch === 'all' || (l.branch || '').toLowerCase() === selBranch.toLowerCase()) &&
+        (selOrg === 'all' || (l.organization || '').toLowerCase() === selOrg.toLowerCase()) &&
+        (selS === 'all' || l.studio_id === selS) && 
+        (selP === 'all' || l.platform === selP) && 
+        (selH === 'all' || l.host_name === selH)
+    );
+    createOpts(getAvailable('brand', logsForBrand), fBrand, selB);
+
+    const logsForPlatform = allLogs.filter(l => 
+        (selBranch === 'all' || (l.branch || '').toLowerCase() === selBranch.toLowerCase()) &&
+        (selOrg === 'all' || (l.organization || '').toLowerCase() === selOrg.toLowerCase()) &&
+        (selS === 'all' || l.studio_id === selS) && 
+        (selB === 'all' || l.brand === selB) && 
+        (selH === 'all' || l.host_name === selH)
+    );
+    createOpts(getAvailable('platform', logsForPlatform), fPlatform, selP);
+
+    const logsForHost = allLogs.filter(l => 
+        (selBranch === 'all' || (l.branch || '').toLowerCase() === selBranch.toLowerCase()) &&
+        (selOrg === 'all' || (l.organization || '').toLowerCase() === selOrg.toLowerCase()) &&
+        (selS === 'all' || l.studio_id === selS) && 
+        (selB === 'all' || l.brand === selB) && 
+        (selP === 'all' || l.platform === selP)
+    );
+    createOpts(getAvailable('host_name', logsForHost), fHost, selH);
 }
 
 function renderLogs() {
@@ -83,6 +191,7 @@ function renderLogs() {
 
     
     matchCount.textContent = filteredLogs.length;
+    populateFilters(); // Cascading update
 
     if (filteredLogs.length === 0) {
         tbodyLogs.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-secondary">No sessions match the selected filters.</td></tr>`;

@@ -39,7 +39,7 @@ export async function init(onProgress) {
             delegate: 'GPU'  // Use WebGL for better performance
         },
         runningMode: 'VIDEO',
-        minDetectionConfidence: 0.4,
+        minDetectionConfidence: 0.3,
     });
 
     _isReady = true;

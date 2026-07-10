@@ -63,7 +63,7 @@
     <nav class="navbar navbar-expand-lg py-3 px-4">
         <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center gap-2 fs-5 fw-semibold text-white" href="index.html">
-                <img src="assets/images/orbizlogo.png" alt="ORBIZ Logo" class="rounded-circle object-fit-cover me-2 shadow-sm" style="width: 28px; height: 28px; border: 2px solid var(--theme-primary);"> ORCA <span class="text-secondary fw-normal px-2">|</span> SUPERADMIN
+                <i data-lucide="shield-check" class="text-white"></i> ORCA <span class="text-secondary fw-normal px-2">|</span> SUPERADMIN
             </a>
             <div class="ms-auto d-flex align-items-center gap-3">
                 <span class="text-secondary small">Logged in as <strong class="text-white" id="display-user">...</strong></span>
@@ -147,7 +147,10 @@
                                         <input type="text" id="fetch-date-range" class="form-control form-control-sm text-center" placeholder="Select Date Range...">
                                     </div>
                                     <button id="btn-fetch-data" class="btn btn-sm btn-outline-primary px-3 d-flex align-items-center gap-2">
-                                        <i data-lucide="database-zap" style="width: 14px;"></i>
+                                        <i data-lucide="database-zap" style="width: 14px;"></i> Fetch
+                                    </button>
+                                    <button id="btn-reset-filters" class="btn btn-sm btn-outline-secondary px-3 d-flex align-items-center gap-2" title="Reset Filters">
+                                        <i data-lucide="refresh-ccw" style="width: 14px;"></i> Reset
                                     </button>
                                 </div>
                                 <div class="text-end d-flex align-items-center gap-3">
