@@ -311,10 +311,7 @@ function renderGrid() {
                         <h6 class="mb-0 text-white fw-bold brand-font" style="letter-spacing: 1px;">${isActive ? (statusData.brand || '-') : '-'}</h6>
                         <small class="text-secondary">${isActive ? (statusData.host || '-') : '-'}</small>
                     </div>
-                    <div class="mt-auto pt-3 d-flex justify-content-between align-items-center border-top border-secondary mt-3">
-                        <small class="text-secondary d-flex align-items-center gap-1">
-                            <i data-lucide="user" style="width: 14px"></i> ${isActive ? (statusData.operator || '-') : '-'}
-                        </small>
+                    <div class="mt-auto pt-3 d-flex justify-content-end align-items-center border-top border-secondary mt-3">
                         <small class="text-info font-monospace fw-bold uptime-clock" data-time="${isActive ? statusData.updatedAt : ''}">
                             ${isActive ? '00:00:00' : '--:--'}
                         </small>
