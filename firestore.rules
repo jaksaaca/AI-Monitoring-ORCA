@@ -1,68 +1,17 @@
 rules_version = '2';
 
 // ================================================
-//  ORCA Host Monitoring — Firestore Security Rules
-//  Deploy with: firebase deploy --only firestore:rules
+//  ORCA Host Monitoring - Firestore Security Rules
+//  Development Mode (Open Rules)
 //  Author: Jaksa Setia Alam
 // ================================================
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ---- USERS COLLECTION ----
-    // Only authenticated superadmins should manage users.
-    // Since we use custom auth (not Firebase Auth), we restrict
-    // by locking down write access entirely from client.
-    // TODO: Migrate to Firebase Auth for proper token-based rules.
-    match /users/{userId} {
-      // Allow read for login verification
-      allow read: if true;
-      // Block direct client writes — use Cloud Functions instead
-      // For now, allow writes but log a warning in production
-      allow write: if true;
-      // PRODUCTION: allow write: if false; (use Cloud Functions)
-    }
-
-    // ---- SCHEDULES COLLECTION ----
-    match /schedules/{scheduleId} {
-      allow read: if true;
-      // Only allow writes with valid schedule structure
-      allow create, update: if isValidSchedule(request.resource.data);
-      allow delete: if true;
-    }
-
-    // ---- SESSION LOGS ----
-    match /sessions/{sessionId} {
-      allow read: if true;
-      // Validate session log data structure on write
-      allow create: if isValidSessionLog(request.resource.data);
-      allow delete: if true;
-      // Disallow updates to prevent tampering with historical data
-      allow update: if false;
-    }
-
-    // ---- STUDIO STATUS (HEARTBEAT) ----
-    match /studio_status/{statusId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // ---- VALIDATION FUNCTIONS ----
-
-    function isValidSchedule(data) {
-      return data.keys().hasAll(['branch', 'organization', 'studio', 'hostName'])
-          && data.branch is string
-          && data.organization is string
-          && data.studio is string
-          && data.hostName is string;
-    }
-
-    function isValidSessionLog(data) {
-      return data.keys().hasAll(['branch', 'host_name', 'total_duration_seconds', 'timestamp'])
-          && data.branch is string
-          && data.host_name is string
-          && data.total_duration_seconds is number
-          && data.total_duration_seconds >= 0;
+    // Membuka semua akses baca dan tulis untuk mempermudah development
+    // TODO: Pasang kembali rules strict saat naik ke Production
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
