@@ -300,8 +300,10 @@ function renderGrid() {
         // Timeout check (Heartbeat detection)
         if (isActive && statusData.updatedAt) {
             const timeSinceLastPing = new Date().getTime() - statusData.updatedAt;
-            // If no ping for 30 seconds (30000 ms), consider it dead/offline
-            if (timeSinceLastPing > 30000) {
+            // Jika selisih waktu lebih dari 3 menit (180000 ms), anggap PC mati.
+            // Toleransi 3 menit sangat penting karena jam di PC Admin dan PC Studio seringkali tidak sinkron.
+            // Jika kita pasang 30 detik, PC yang jamnya telat 1 menit akan dianggap mati padahal sedang live.
+            if (timeSinceLastPing > 180000 || timeSinceLastPing < -180000) {
                 isActive = false;
             }
         }
