@@ -1,28 +1,27 @@
 /**
  * ================================================
- *  ORCA Host Monitoring — Bootstrap 5 Overrides
- *  Main styling is handled by Bootstrap (dark mode).
+ *  ORCA Host Monitoring — Global Stylesheet
+ *  Bootstrap 5 Dark Theme Overrides + Custom Styles.
+ *  All shared styles consolidated here (no inline
+ *  <style> blocks needed in HTML files).
+ *  Author: Jaksa Setia Alam
  * ================================================
  */
 
-body {
-    -webkit-font-smoothing: antialiased;
-    background-color: var(--theme-bg) !important;
-    color: var(--theme-text) !important;
-}
-
-/* Premium Dark Theme Variables */
+/* ================================================
+   1. DESIGN TOKENS (CSS Custom Properties)
+   ================================================ */
 :root, [data-bs-theme="dark"] {
     color-scheme: dark;
     /* Color Palette */
-    --theme-bg: #0B0E14;        /* Midnight Blue/Dark Space */
-    --theme-surface: #151A23;   /* Elevated Card Surface */
-    --theme-border: #222A38;    /* Subtle lines */
-    --theme-primary: #3B82F6;   /* Electric Blue Accent */
+    --theme-bg: #0B0E14;
+    --theme-surface: #151A23;
+    --theme-border: #222A38;
+    --theme-primary: #3B82F6;
     --theme-primary-hover: #2563EB;
     --theme-text: #F3F4F6;
     --theme-text-muted: #9CA3AF;
-    
+
     /* Bootstrap Overrides */
     --bs-body-bg: var(--theme-bg);
     --bs-body-color: var(--theme-text);
@@ -33,75 +32,122 @@ body {
     --bs-border-color: var(--theme-border);
 }
 
-/* Global Premium Overrides */
+/* ================================================
+   2. GLOBAL BASE STYLES
+   ================================================ */
+body {
+    -webkit-font-smoothing: antialiased;
+    font-family: 'Inter', sans-serif;
+    background-color: var(--theme-bg);
+    color: var(--theme-text);
+}
+
+h1, h2, h3, h4, h5, h6, .navbar-brand, .brand-font {
+    font-family: 'Outfit', sans-serif;
+    letter-spacing: -0.02em;
+}
+
+/* ================================================
+   3. COMPONENT OVERRIDES (no !important needed —
+      our stylesheet loads AFTER Bootstrap)
+   ================================================ */
+
+/* Cards */
 .card {
-    background-color: var(--theme-surface) !important;
-    border: 1px solid var(--theme-border) !important;
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
-    border-radius: 16px !important;
+    background-color: var(--theme-surface);
+    border: 1px solid var(--theme-border);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    border-radius: 16px;
     backdrop-filter: blur(10px);
 }
 .card-header {
-    border-bottom: 1px solid var(--theme-border) !important;
-    background-color: transparent !important;
+    border-bottom: 1px solid var(--theme-border);
+    background-color: transparent;
 }
+
+/* Navbar */
 .navbar {
-    background-color: rgba(11, 14, 20, 0.75) !important;
+    background-color: rgba(11, 14, 20, 0.75);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border-bottom: 1px solid var(--theme-border) !important;
+    border-bottom: 1px solid var(--theme-border);
 }
-.border-secondary {
-    border-color: var(--theme-border) !important;
-}
+
+/* Forms */
 .form-control, .form-select {
-    background-color: rgba(0, 0, 0, 0.2) !important;
-    border: 1px solid var(--theme-border) !important;
-    color: var(--theme-text) !important;
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--theme-border);
+    color: var(--theme-text);
     border-radius: 8px;
     transition: all 0.2s ease;
 }
 .form-control:focus, .form-select:focus {
-    border-color: var(--theme-primary) !important;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+    border-color: var(--theme-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 select option {
-    background-color: var(--theme-surface) !important;
-    color: var(--theme-text) !important;
+    background-color: var(--theme-surface);
+    color: var(--theme-text);
 }
+
+/* Buttons */
 .btn-primary {
-    background-color: var(--theme-primary) !important;
-    border-color: var(--theme-primary) !important;
-    color: #ffffff !important;
+    background-color: var(--theme-primary);
+    border-color: var(--theme-primary);
+    color: #ffffff;
     font-weight: 500;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
     border-radius: 8px;
     transition: all 0.2s ease;
 }
 .btn-primary:hover {
-    background-color: var(--theme-primary-hover) !important;
-    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4) !important;
+    background-color: var(--theme-primary-hover);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
     transform: translateY(-1px);
 }
 .btn-outline-light {
-    border-color: var(--theme-border) !important;
-    color: var(--theme-text) !important;
+    border-color: var(--theme-border);
+    color: var(--theme-text);
 }
 .btn-outline-light:hover {
-    background-color: rgba(255, 255, 255, 0.05) !important;
-    border-color: var(--theme-text-muted) !important;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: var(--theme-text-muted);
 }
+
+/* Tables */
 .table-dark {
     --bs-table-bg: transparent;
     --bs-table-hover-bg: rgba(255, 255, 255, 0.03);
 }
-.table th { border-bottom: 1px solid var(--theme-border) !important; background-color: rgba(0,0,0,0.2) !important; color: var(--theme-text-muted) !important; }
-.table td { border-bottom: 1px solid var(--theme-border) !important; vertical-align: middle; }
+.table th {
+    border-bottom: 1px solid var(--theme-border);
+    background-color: rgba(0, 0, 0, 0.2);
+    color: var(--theme-text-muted);
+}
+.table td {
+    border-bottom: 1px solid var(--theme-border);
+    vertical-align: middle;
+}
 .table-active, .table-active > th, .table-active > td {
-    background-color: rgba(0, 0, 0, 0.4) !important;
+    background-color: rgba(0, 0, 0, 0.4);
 }
 
-/* Utility Overrides to prevent "belang" */
+/* Modals */
+.modal-content {
+    background-color: var(--theme-surface);
+    border: 1px solid var(--theme-border);
+    border-radius: 16px;
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8);
+}
+.modal-header {
+    border-bottom: 1px solid var(--theme-border);
+}
+
+/* ================================================
+   4. BOOTSTRAP UTILITY OVERRIDES
+   (These need !important to beat Bootstrap's
+    own !important on utility classes)
+   ================================================ */
 .bg-dark {
     background-color: rgba(0, 0, 0, 0.25) !important;
 }
@@ -111,23 +157,18 @@ select option {
 .text-white, .text-light {
     color: var(--theme-text) !important;
 }
-.border-secondary {
-    border-color: var(--theme-border) !important;
-}
 .text-dark {
     color: var(--theme-bg) !important;
 }
-.modal-content {
-    background-color: var(--theme-surface) !important;
-    border: 1px solid var(--theme-border) !important;
-    border-radius: 16px;
-    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8) !important;
-}
-.modal-header {
-    border-bottom: 1px solid var(--theme-border) !important;
+.border-secondary {
+    border-color: var(--theme-border) !important;
 }
 
-/* Gradients */
+/* ================================================
+   5. CUSTOM COMPONENTS
+   ================================================ */
+
+/* Gradient Text */
 .brand-gradient-text {
     background: linear-gradient(135deg, #60A5FA 0%, #3B82F6 100%);
     -webkit-background-clip: text;
@@ -135,16 +176,26 @@ select option {
     -webkit-text-fill-color: transparent;
 }
 
+/* Utility */
+.letter-spacing-1 { letter-spacing: 1px; }
+
 /* Lucide Icon Sizing */
 .icon-sm { width: 16px; height: 16px; }
 .icon-md { width: 20px; height: 20px; }
 .icon-lg { width: 48px; height: 48px; }
 
-/* Camera Container & Canvas Overlap */
+/* Modern Badges (Host Monitoring) */
+.badge.bg-success { background-color: rgba(16, 185, 129, 0.1) !important; color: #10b981 !important; border: 1px solid rgba(16,185,129,0.2) !important; }
+.badge.bg-danger { background-color: rgba(239, 68, 68, 0.1) !important; color: #ef4444 !important; border: 1px solid rgba(239,68,68,0.2) !important; }
+.badge.bg-dark { background-color: rgba(255, 255, 255, 0.05) !important; color: #a1a1aa !important; border: 1px solid rgba(255,255,255,0.1) !important; }
+
+/* ================================================
+   6. CAMERA & OVERLAY
+   ================================================ */
 .camera-container {
     position: relative;
     width: 100%;
-    height: 100%; /* Take full available height in flex container */
+    height: 100%;
     background-color: #000;
     overflow: hidden;
     display: flex;
@@ -152,25 +203,21 @@ select option {
     justify-content: center;
     border-radius: 12px;
 }
-
 .camera-container video {
     width: 100%;
     height: 100%;
-    object-fit: contain; /* Show full video, allow black bars on sides */
+    object-fit: contain;
 }
-
 .camera-container canvas {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain; /* MUST MATCH VIDEO exactly to align AI overlay */
+    object-fit: contain;
     pointer-events: none;
     z-index: 10;
 }
-
-/* Internal Camera Overlays */
 .overlay-center {
     position: absolute;
     inset: 0;
@@ -178,10 +225,9 @@ select option {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background-color: rgba(33, 37, 41, 0.85); /* Bootstrap Dark matching */
+    background-color: rgba(33, 37, 41, 0.85);
     z-index: 20;
 }
-
 .live-status-overlay {
     position: absolute;
     top: 1rem;
@@ -190,7 +236,6 @@ select option {
     gap: 0.5rem;
     z-index: 20;
 }
-
 .rec-indicator {
     position: absolute;
     top: 1rem;
@@ -199,52 +244,57 @@ select option {
     backdrop-filter: blur(4px);
 }
 
-/* Pulsing Red Dot */
+/* Pulsing Dot Animations */
 .dot-pulse {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     display: inline-block;
-    background-color: #dc3545; /* Bootstrap danger */
+    background-color: #dc3545;
     animation: pulse-danger 1.5s infinite alternate;
 }
 @keyframes pulse-danger {
     0% { opacity: 0.2; box-shadow: 0 0 0 0 rgba(220,53,69,0.7); }
     100% { opacity: 1; box-shadow: 0 0 0 6px rgba(220,53,69,0); }
 }
-
-/* System Ready Dot */
 .dot-ready {
     width: 10px;
     height: 10px;
     border-radius: 50%;
     display: inline-block;
-    background-color: #198754; /* Bootstrap success */
+    background-color: #198754;
 }
 .dot-ready.recording {
     background-color: #dc3545;
     animation: pulse-danger 1.5s infinite alternate;
 }
 
-/* Upload Area for Admin */
+/* ================================================
+   7. UPLOAD AREA (Admin)
+   ================================================ */
 .upload-area {
-    border: 2px dashed #495057;
-    border-radius: 0.5rem;
+    border: 2px dashed var(--theme-border);
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
     padding: 3rem;
     text-align: center;
     cursor: pointer;
-    transition: all 0.2s ease-in-out;
+    transition: all 0.2s ease;
+    color: var(--theme-text-muted);
 }
 .upload-area:hover {
-    border-color: #0d6efd;
-    background-color: rgba(13, 110, 253, 0.05);
+    border-color: var(--theme-primary);
+    background-color: rgba(59, 130, 246, 0.05);
+    color: var(--theme-text);
 }
 
-/* Loading Screen */
+/* ================================================
+   8. LOADING SCREEN
+   ================================================ */
 #loading-screen {
     position: fixed;
     inset: 0;
-    background-color: #212529;
+    background-color: var(--theme-bg);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -258,28 +308,46 @@ select option {
 }
 
 /* ================================================
-   RESPONSIVE: Mobile & Tablet Camera Preview
-   On small screens, camera preview stays visible
-   at the top while controls scroll below it.
+   9. RESPONSIVE: Mobile & Tablet
    ================================================ */
 @media (max-width: 991.98px) {
-    /* Camera column sticks to top on mobile */
+    body {
+        height: auto;
+        min-height: 100vh;
+        overflow-x: hidden;
+    }
+    #app-container {
+        height: auto;
+    }
+    .container-fluid.h-100, .row.h-100 {
+        height: auto;
+    }
+    .col-lg-3, .col-lg-9 {
+        height: auto;
+        overflow: visible;
+    }
+    .row.g-3 > div {
+        margin-top: 0.5rem;
+    }
+    .card-body h4 {
+        font-size: 1.25rem;
+    }
+
+    /* Camera column sticky on mobile */
     .order-1.col-lg-9 {
         position: sticky;
         top: 0;
         z-index: 50;
         background-color: var(--theme-bg);
-        padding-bottom: 0.5rem !important;
+        padding-bottom: 0.5rem;
     }
-
-    /* Fixed height for camera on mobile */
     .camera-container {
         min-height: 220px;
         max-height: 280px;
-        flex-grow: 0 !important;
+        flex-grow: 0;
     }
 
-    /* Stats row: horizontal scroll on mobile */
+    /* Stats: horizontal scroll on mobile */
     .order-1.col-lg-9 > .row.g-3 {
         flex-wrap: nowrap;
         overflow-x: auto;
@@ -294,13 +362,13 @@ select option {
         font-size: 1rem;
     }
 
-    /* Allow sidebar to scroll naturally below */
+    /* Sidebar scrolls naturally */
     .order-2.col-lg-3 {
-        height: auto !important;
-        overflow: visible !important;
+        height: auto;
+        overflow: visible;
     }
 
-    /* Badges: smaller on mobile */
+    /* Smaller badges on mobile */
     .live-status-overlay {
         gap: 0.25rem;
         top: 0.5rem;
@@ -309,5 +377,11 @@ select option {
     .live-status-overlay .badge {
         font-size: 0.65rem;
         padding: 0.25rem 0.4rem;
+    }
+}
+
+@media (min-width: 992px) {
+    .camera-container {
+        min-height: 450px;
     }
 }

@@ -95,12 +95,46 @@ export function detect(videoElement, timestamp) {
             const w = Math.min(vw - x, rawWidth + marginX * 2);
             const h = Math.min(vh - y, rawHeight + marginY * 2);
 
+            // --- Compute real head pose from key landmarks ---
+            // Uses geometric estimation (zero extra cost, landmarks already computed)
+            const nose = landmarks[1];            // Nose tip
+            const leftEyeInner = landmarks[33];   // Left eye inner corner
+            const rightEyeInner = landmarks[263]; // Right eye inner corner
+            const leftMouth = landmarks[61];      // Left mouth corner
+            const rightMouth = landmarks[291];    // Right mouth corner
+
+            const eyeMidX = (leftEyeInner.x + rightEyeInner.x) / 2;
+            const eyeMidY = (leftEyeInner.y + rightEyeInner.y) / 2;
+            const mouthMidX = (leftMouth.x + rightMouth.x) / 2;
+            const mouthMidY = (leftMouth.y + rightMouth.y) / 2;
+            const faceCenterX = (eyeMidX + mouthMidX) / 2;
+            const faceCenterY = (eyeMidY + mouthMidY) / 2;
+
+            // Inter-ocular distance for angle normalization
+            const eyeDist = Math.hypot(
+                rightEyeInner.x - leftEyeInner.x,
+                rightEyeInner.y - leftEyeInner.y
+            );
+
+            // Yaw (horizontal rotation): nose offset from face center
+            const yaw = Math.atan2(nose.x - faceCenterX, eyeDist * 0.5) * (180 / Math.PI);
+            // Pitch (vertical rotation): nose position relative to face midline
+            const pitch = Math.atan2(faceCenterY - nose.y, eyeDist * 0.5) * (180 / Math.PI);
+            // Roll (head tilt): angle of the inter-ocular line
+            const roll = Math.atan2(
+                rightEyeInner.y - leftEyeInner.y,
+                rightEyeInner.x - leftEyeInner.x
+            ) * (180 / Math.PI);
+
             return {
                 x: Math.round(x),
                 y: Math.round(y),
                 width: Math.round(w),
                 height: Math.round(h),
-                confidence: 1 // Landmarker assumes confidence is high if returned
+                confidence: 1,
+                yaw: Math.round(yaw * 10) / 10,   // 1 decimal precision
+                pitch: Math.round(pitch * 10) / 10,
+                roll: Math.round(roll * 10) / 10,
             };
         });
     } catch (e) {

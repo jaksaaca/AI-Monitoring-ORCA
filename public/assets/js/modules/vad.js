@@ -19,6 +19,12 @@ let _rafId = null;
 let _holdTimer = null;
 const HOLD_TIME_MS = 1000;
 
+// Adaptive noise floor estimation
+let _noiseFloor = 0.005;
+const NOISE_ALPHA = 0.997;      // Slow-moving average (converges over ~5 seconds)
+const SPEECH_RATIO = 3.0;       // Speech must be 3x louder than noise floor
+const MIN_THRESHOLD = 0.005;    // Absolute minimum to avoid triggering on silence
+
 /**
  * Start VAD from a given media stream (or request one).
  * @param {string|null} deviceId — specific microphone device ID, or null for default
@@ -56,7 +62,7 @@ export async function start(deviceId = null) {
         lowpass.frequency.value = 3000;
 
         analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 2048;
+        analyser.fftSize = 512; // 512 is sufficient for RMS (was 2048 — overkill)
         
         // Route: Source -> Highpass -> Lowpass -> Analyser
         sourceNode.connect(highpass);
@@ -74,9 +80,16 @@ export async function start(deviceId = null) {
                 sum += timeDomainBuf[i] * timeDomainBuf[i];
             }
             _currentRms = Math.sqrt(sum / timeDomainBuf.length);
+
+            // Adaptive noise floor: when NOT speaking, slowly track ambient level
+            const effectiveThreshold = Math.max(_noiseFloor * SPEECH_RATIO, _threshold, MIN_THRESHOLD);
+            if (_currentRms < effectiveThreshold) {
+                // Update noise floor estimate (slow-moving average)
+                _noiseFloor = NOISE_ALPHA * _noiseFloor + (1 - NOISE_ALPHA) * _currentRms;
+            }
             
-            // Logika Hold-Time (Hysteresis)
-            if (_currentRms > _threshold) {
+            // Hold-Time Hysteresis with adaptive threshold
+            if (_currentRms > effectiveThreshold) {
                 _isSpeaking = true;
                 if (_holdTimer) {
                     clearTimeout(_holdTimer);

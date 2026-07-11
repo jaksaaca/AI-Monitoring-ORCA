@@ -7,6 +7,7 @@
  */
 
 import { uploadSchedule, getSchedule, subscribeToStudioStatus } from "./modules/firebase-db.js";
+import { BRANCHES, getBranch, populateBranchSelect, populateOrgSelect } from "./modules/config.js";
 
 // Check Auth
 const authData = JSON.parse(sessionStorage.getItem('orca_auth'));
@@ -21,6 +22,12 @@ const btnSave = document.getElementById('btn-save-schedule');
 const btnClear = document.getElementById('btn-clear-schedule');
 const adminBranch = document.getElementById('admin-branch');
 const adminOrganization = document.getElementById('admin-organization');
+
+// Populate branch & org dropdowns from config
+populateBranchSelect(adminBranch);
+populateOrgSelect(adminOrganization);
+const ccBranchEl = document.getElementById('cc-branch');
+if (ccBranchEl) populateBranchSelect(ccBranchEl);
 
 // Internal state
 let scheduleData = [];
@@ -299,12 +306,13 @@ function listenToStatus() {
 
 function renderGrid() {
     const branch = ccBranch.value;
-    const numStudios = branch === 'Bandung' ? 30 : 11;
+    const branchConfig = getBranch(branch);
+    const numStudios = branchConfig ? branchConfig.studioCount : 10;
     
     ccGrid.innerHTML = '';
     
     for (let i = 1; i <= numStudios; i++) {
-        const suffix = branch === 'Bandung' ? 'BDG' : 'JKT';
+        const suffix = branchConfig ? branchConfig.suffix : '';
         const studioName = `Studio ${i} ${suffix}`;
         const statusData = currentStatuses[studioName] || { status: 'idle' };
         let isActive = statusData.status === 'active';

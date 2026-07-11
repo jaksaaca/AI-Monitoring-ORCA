@@ -1,4 +1,5 @@
 import { getAllSessionLogs, getAllUsers, createUser, deleteUser, deleteSessionLog } from "./modules/firebase-db.js";
+import { populateBranchSelect, populateOrgSelect } from "./modules/config.js";
 
 // Check Auth
 const authData = JSON.parse(sessionStorage.getItem('orca_auth'));
@@ -24,6 +25,10 @@ const fPlatform = document.getElementById('filter-platform');
 const fHost = document.getElementById('filter-host');
 const matchCount = document.getElementById('match-count');
 const btnDownload = document.getElementById('btn-download');
+
+// Populate branch & org dropdowns from config
+if (fBranch) populateBranchSelect(fBranch, { includeAll: true });
+if (fOrganization) populateOrgSelect(fOrganization, { includeAll: true });
 
 const dateRangeInput = document.getElementById('fetch-date-range');
 const btnFetchData = document.getElementById('btn-fetch-data');
@@ -194,7 +199,7 @@ function renderLogs() {
     populateFilters(); // Cascading update
 
     if (filteredLogs.length === 0) {
-        tbodyLogs.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-secondary">No sessions match the selected filters.</td></tr>`;
+        tbodyLogs.innerHTML = `<tr><td colspan="12" class="text-center py-4 text-secondary">No sessions match the selected filters.</td></tr>`;
         document.getElementById('pagination-info').textContent = "Showing 0 of 0 entries";
         document.getElementById('pagination-ul').innerHTML = "";
         return;
@@ -286,24 +291,7 @@ window.changePage = (page) => {
     renderLogs();
 };
 
-document.getElementById('btn-fetch-data').addEventListener('click', async () => {
-    const sDate = document.getElementById('fetch-start-date').value;
-    const eDate = document.getElementById('fetch-end-date').value;
-    const btn = document.getElementById('btn-fetch-data');
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Fetching...';
-    btn.disabled = true;
-    try {
-        allLogs = await getAllSessionLogs(sDate || null, eDate || null);
-        populateFilters();
-        currentPage = 1;
-        renderLogs();
-    } catch (e) {
-        alert("Failed to fetch data: " + e.message);
-    }
-    btn.innerHTML = '<i data-lucide="database-zap" style="width: 16px;"></i> Tarik Data';
-    btn.disabled = false;
-    lucide.createIcons();
-});
+// (Duplicate fetch listener removed — was referencing non-existent DOM elements)
 
 window.deleteLog = async (id) => {
     if (confirm("Are you sure you want to permanently delete this session log? This cannot be undone.")) {

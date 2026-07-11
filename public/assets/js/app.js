@@ -15,6 +15,17 @@ import * as Session from './modules/session.js';
 import { drawOverlay } from './modules/canvas-overlay.js';
 import { playSoftWarning } from './modules/audio-warning.js';
 import { listenToSchedule, saveSessionLog, subscribeToStudioStatus, setStudioStatus } from './modules/firebase-db.js';
+import { BRANCHES } from './modules/config.js';
+
+// ============================================
+// GLOBAL ERROR HANDLER
+// ============================================
+window.addEventListener('error', (e) => {
+    console.error('[ORCA Global Error]', e.message, e.filename, e.lineno);
+});
+window.addEventListener('unhandledrejection', (e) => {
+    console.error('[ORCA Unhandled Promise]', e.reason);
+});
 
 // Branch Selection
 let currentBranch = sessionStorage.getItem('orca_branch');
@@ -99,6 +110,17 @@ let currentFps       = 0;
 // ============================================
 async function initialize() {
     try {
+        // Generate branch modal buttons from config
+        const branchBtnContainer = document.getElementById('branch-buttons');
+        if (branchBtnContainer) {
+            branchBtnContainer.innerHTML = BRANCHES.map(b => `
+                <button type="button" class="btn btn-outline-light btn-lg" onclick="selectBranch('${b.name}')">
+                    <i data-lucide="map-pin" class="icon-sm me-2"></i> ${b.name} Studio
+                </button>
+            `).join('');
+            if (window.lucide) lucide.createIcons({ root: branchBtnContainer });
+        }
+
         if (!currentBranch) {
             branchModalInstance = new bootstrap.Modal(document.getElementById('branchModal'));
             branchModalInstance.show();
@@ -222,7 +244,8 @@ async function startCamera(deviceId = null) {
         await videoEl.play();
         noCameraOverlay.classList.add('d-none');
 
-        // Match canvas size to video
+        // Match canvas size to video (remove old listener to prevent leak)
+        videoEl.removeEventListener('loadedmetadata', resizeCanvas);
         videoEl.addEventListener('loadedmetadata', resizeCanvas);
         resizeCanvas();
 
@@ -308,7 +331,7 @@ function renderLoop(timestamp) {
     // Always draw overlay (smooth visual updates)
     const face = lastFaces.length > 0 ? lastFaces[0] : null;
 
-    resizeCanvas();
+    // Canvas resize only when dimensions actually change (already handled by the check at line 286)
     drawOverlay(canvasCtx, {
         videoWidth: videoEl.videoWidth,
         videoHeight: videoEl.videoHeight,
@@ -353,6 +376,28 @@ function updateVadMeter() {
 let consecutiveFaceFails = 0;
 const MAX_FAILS_BEFORE_LOST = 3; // LITE OPTIMIZATION: Grace period (3 * 10 frames = 1 second) before dropping face
 
+// Temporal smoothing for pose classification (majority vote)
+const POSE_HISTORY_SIZE = 5;
+const poseHistory = [];
+
+function getSmoothedPose(rawPose) {
+    poseHistory.push(rawPose);
+    if (poseHistory.length > POSE_HISTORY_SIZE) poseHistory.shift();
+    
+    // Count occurrences of each pose in history
+    const counts = {};
+    for (const p of poseHistory) {
+        counts[p] = (counts[p] || 0) + 1;
+    }
+    
+    // Return the most frequent pose (majority vote)
+    let maxCount = 0, winner = rawPose;
+    for (const [pose, count] of Object.entries(counts)) {
+        if (count > maxCount) { maxCount = count; winner = pose; }
+    }
+    return winner;
+}
+
 async function processAI(timestamp) {
     // Step 1: Face Detection
     const faces = FaceDetector.detect(videoEl, timestamp);
@@ -373,9 +418,10 @@ async function processAI(timestamp) {
     // Step 2: Gaze Classification (only if face found)
     if (currentFaceDetected && GazeClassifier.isReady() && lastFaces.length > 0) {
         const result = await GazeClassifier.classify(videoEl, lastFaces[0]);
-        currentPoseClass = result.class;
+        currentPoseClass = getSmoothedPose(result.class); // Temporal smoothing (majority vote)
     } else if (!currentFaceDetected) {
         currentPoseClass = 'Depan'; // Reset when no face
+        poseHistory.length = 0;     // Clear history on face loss
     }
 }
 
@@ -800,7 +846,6 @@ window.addEventListener('unload', () => {
         const { metadata, stats } = Session.stopSession();
         // Release studio
         setStudioStatus(currentBranch, activeSchedule.studio, { status: 'idle' });
-        CSVExport.appendToMasterLog(metadata, stats);
     }
 });
 

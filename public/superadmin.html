@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ORCA Superadmin — Analytics, session log export, and account management for the monitoring system.">
     <title>ORCA | SUPERADMIN</title>
     <link rel="icon" type="image/png" href="assets/images/orbizlogo.png">
     
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
@@ -14,49 +15,39 @@
     <style>
         /* Tom Select Dark Mode Overrides */
         .ts-control {
-            background-color: rgba(0,0,0,0.2) !important;
-            border: 1px solid var(--theme-border) !important;
-            color: var(--theme-text) !important;
-            border-radius: 8px !important;
-            padding: 0.35rem 0.75rem !important;
+            background-color: rgba(0,0,0,0.2);
+            border: 1px solid var(--theme-border);
+            color: var(--theme-text);
+            border-radius: 8px;
+            padding: 0.35rem 0.75rem;
         }
         .ts-control.focus {
-            border-color: var(--theme-primary) !important;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+            border-color: var(--theme-primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
         }
         .ts-dropdown {
-            background-color: var(--theme-surface) !important;
-            border: 1px solid var(--theme-border) !important;
-            color: var(--theme-text) !important;
-            border-radius: 8px !important;
-            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
+            background-color: var(--theme-surface);
+            border: 1px solid var(--theme-border);
+            color: var(--theme-text);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
         }
         .ts-dropdown .option {
-            color: var(--theme-text) !important;
+            color: var(--theme-text);
         }
         .ts-dropdown .option:hover, .ts-dropdown .option.active {
-            background-color: var(--theme-primary) !important;
-            color: white !important;
+            background-color: var(--theme-primary);
+            color: white;
         }
         .ts-control input {
-            color: var(--theme-text) !important;
+            color: var(--theme-text);
         }
         .ts-wrapper.single .ts-control:after {
-            border-color: var(--theme-text-muted) transparent transparent transparent !important;
+            border-color: var(--theme-text-muted) transparent transparent transparent;
         }
     </style>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        body { 
-            font-family: 'Inter', sans-serif; 
-        }
-        h1, h2, h3, h4, h5, h6, .brand-font {
-            font-family: 'Outfit', sans-serif !important;
-            letter-spacing: -0.02em;
-        }
-        .letter-spacing-1 { letter-spacing: 1px; }
-    </style>
+    <link rel="stylesheet" href="assets/css/style.css?v=5">
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js" crossorigin="anonymous"></script>
 </head>
 <body class="d-flex flex-column min-vh-100">
 
@@ -102,9 +93,7 @@
                             <div class="col-md-2">
                                 <label class="form-label small text-secondary">Location</label>
                                 <select id="filter-branch" class="form-select form-select-sm">
-                                    <option value="all">All Branches</option>
-                                    <option value="Jakarta">Jakarta</option>
-                                    <option value="Bandung">Bandung</option>
+                                    <!-- Populated dynamically from config.js -->
                                 </select>
                             </div>
                             <div class="col-md-2">
@@ -134,9 +123,7 @@
                             <div class="col-md-2">
                                 <label class="form-label small text-secondary">Organization</label>
                                 <select id="filter-organization" class="form-select form-select-sm">
-                                    <option value="all">All Organizations</option>
-                                    <option value="ORCA">ORCA</option>
-                                    <option value="Reckitt">Reckitt</option>
+                                    <!-- Populated dynamically from config.js -->
                                 </select>
                             </div>
 
@@ -276,10 +263,10 @@
         <small class="text-secondary">&copy; 2026 ORCA Operator. Developed by Jaksa Setia Alam</small>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
     <script>lucide.createIcons();</script>
-    <script type="module" src="assets/js/superadmin.js"></script>
+    <script type="module" src="assets/js/superadmin.js?v=5"></script>
 </body>
 </html>

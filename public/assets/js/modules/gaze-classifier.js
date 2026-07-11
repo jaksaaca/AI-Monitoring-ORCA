@@ -17,6 +17,16 @@ const INPUT_SIZE = 224;
 const MEAN = [0.485, 0.456, 0.406];
 const STD  = [0.229, 0.224, 0.225];
 
+// Pre-allocated buffers for preprocessing (avoids ~600KB GC per frame)
+const TOTAL_PIXELS = INPUT_SIZE * INPUT_SIZE;
+const _float32Buf = new Float32Array(3 * TOTAL_PIXELS);
+const _tensorDims = [1, 3, INPUT_SIZE, INPUT_SIZE];
+
+// Class bias: boosts underrepresented classes in logit space BEFORE softmax.
+// This corrects model bias toward 'Depan' without the aggressive 5% override hack.
+// Bawah bias of 1.5 ≈ 4.5x probability boost (principled alternative to SENSITIVITAS_NUNDUK)
+const CLASS_BIAS = [0, 0, 0, 0, 1.5]; // [Depan, Kiri, Kanan, Atas, Bawah]
+
 /**
  * Initialize ONNX Runtime session with the gaze model.
  * @param {string} modelPath — path to the .onnx model file
@@ -29,10 +39,9 @@ export async function init(modelPath, onProgress) {
     onProgress?.('Loading gaze classification model...');
 
     try {
-        // Configure ONNX Runtime for optimal browser performance
-        // Use 'wasm' as execution provider (most compatible)
+        // Configure ONNX Runtime — prefer GPU (WebGL) with WASM fallback
         session = await ort.InferenceSession.create(modelPath, {
-            executionProviders: ['wasm'],
+            executionProviders: ['webgl', 'wasm'],
             graphOptimizationLevel: 'all',
         });
 
@@ -66,14 +75,13 @@ export async function classify(source, faceBox) {
         const output = results['output'];
         const logits = output.data;
 
-        // --- CONFIGURATION ---
-        // SENSITIVITAS "Nunduk" (Bawah). Range 0.0 - 1.0
-        // Semakin KECIL angkanya, semakin GAMPANG/SENSITIF AI mendeteksi nunduk.
-        const SENSITIVITAS_NUNDUK = 0.05; // Diubah jadi 5% (SANGAT SENSITIF)
-
-        // Step 3: Calculate probabilities for all classes (Softmax)
-        let maxLogit = logits[0];
-        for (let i = 1; i < logits.length; i++) {
+        // Step 3: Apply class bias to correct model imbalance, then softmax
+        // This replaces the old SENSITIVITAS_NUNDUK=0.05 hack which forced
+        // 'Bawah' whenever it had ≥5% probability (causing massive false positives).
+        // Class bias adds to logits BEFORE softmax — mathematically principled.
+        let maxLogit = -Infinity;
+        for (let i = 0; i < logits.length; i++) {
+            logits[i] += CLASS_BIAS[i]; // Apply bias in logit space
             if (logits[i] > maxLogit) maxLogit = logits[i];
         }
 
@@ -98,16 +106,7 @@ export async function classify(source, faceBox) {
             }
         }
 
-        // --- Custom Sensitivity Logic ---
-        // Jika probabilitas 'Bawah' (index 4) mencapai batas sensitivitas (misal 25%),
-        // kita langsung paksa vonis jadi 'Bawah', tak peduli walaupun 'Depan' skornya lebih besar.
-        // Ini mengatasi model yang terlalu kebal (bias) ke depan.
-        if (probs[4] >= SENSITIVITAS_NUNDUK) {
-            maxIdx = 4;
-        }
-
         const confidence = probs[maxIdx];
-
         let poseClass = CLASSES[maxIdx];
 
         // Mirror correction (same as Python version):
@@ -138,9 +137,10 @@ export async function classify(source, faceBox) {
 function preprocessFace(source, box) {
     // Use an offscreen canvas to crop and resize
     const canvas = getOffscreenCanvas();
+    // Avoid resetting dimensions if already correct (prevents canvas buffer realloc)
+    if (canvas.width !== INPUT_SIZE) canvas.width = INPUT_SIZE;
+    if (canvas.height !== INPUT_SIZE) canvas.height = INPUT_SIZE;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    canvas.width = INPUT_SIZE;
-    canvas.height = INPUT_SIZE;
 
     // Draw the cropped face region, scaled to 224x224
     ctx.drawImage(
@@ -153,23 +153,19 @@ function preprocessFace(source, box) {
     const imageData = ctx.getImageData(0, 0, INPUT_SIZE, INPUT_SIZE);
     const pixels = imageData.data; // Uint8ClampedArray, length = 224*224*4
 
-    // Create float32 array in NCHW format: [1, 3, 224, 224]
-    const totalPixels = INPUT_SIZE * INPUT_SIZE;
-    const float32Data = new Float32Array(3 * totalPixels);
-
-    for (let i = 0; i < totalPixels; i++) {
+    // Reuse pre-allocated buffer (NCHW format: [1, 3, 224, 224])
+    for (let i = 0; i < TOTAL_PIXELS; i++) {
         const r = pixels[i * 4] / 255.0;
         const g = pixels[i * 4 + 1] / 255.0;
         const b = pixels[i * 4 + 2] / 255.0;
 
-        // Channel-first order: R plane, then G plane, then B plane
-        // Apply ImageNet normalization: (pixel - mean) / std
-        float32Data[i]                  = (r - MEAN[0]) / STD[0];
-        float32Data[i + totalPixels]    = (g - MEAN[1]) / STD[1];
-        float32Data[i + totalPixels * 2] = (b - MEAN[2]) / STD[2];
+        // Channel-first + ImageNet normalization: (pixel - mean) / std
+        _float32Buf[i]                   = (r - MEAN[0]) / STD[0];
+        _float32Buf[i + TOTAL_PIXELS]    = (g - MEAN[1]) / STD[1];
+        _float32Buf[i + TOTAL_PIXELS * 2] = (b - MEAN[2]) / STD[2];
     }
 
-    return new ort.Tensor('float32', float32Data, [1, 3, INPUT_SIZE, INPUT_SIZE]);
+    return new ort.Tensor('float32', _float32Buf, _tensorDims);
 }
 
 // Reusable offscreen canvas for preprocessing

@@ -73,21 +73,17 @@ export function drawOverlay(ctx, opts) {
         ctx.textBaseline = 'middle';
         ctx.fillText(label, labelX + 8, labelY + labelH / 2);
 
-        // ---- 3D Axis Lines ----
+        // ---- 3D Axis Lines (using REAL pose angles from landmarks) ----
         const centerX = fx + fw / 2;
         const centerY = fy + fh / 2;
         const axisSize = Math.min(fw, fh) * 0.35;
 
-        const mockAngles = {
-            'Depan': { yaw: 0, pitch: 0, roll: 0 },
-            'Kiri': { yaw: -30, pitch: 0, roll: 0 },
-            'Kanan': { yaw: 30, pitch: 0, roll: 0 },
-            'Atas': { yaw: 0, pitch: 30, roll: 0 },
-            'Bawah': { yaw: 0, pitch: -30, roll: 0 },
-        };
-
-        const angles = mockAngles[poseClass] || mockAngles['Depan'];
-        drawAxis(ctx, centerX, centerY, angles.yaw, angles.pitch, angles.roll, axisSize);
+        // Use real angles computed from MediaPipe 478 landmarks (face-detector.js)
+        // Falls back to 0 if angles not available (backward compatible)
+        const yaw = face.yaw || 0;
+        const pitch = face.pitch || 0;
+        const roll = face.roll || 0;
+        drawAxis(ctx, centerX, centerY, yaw, pitch, roll, axisSize);
 
     } else {
         // ---- No Face Detected ----
