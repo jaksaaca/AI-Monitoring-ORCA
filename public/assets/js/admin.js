@@ -158,13 +158,13 @@ function renderTable() {
             <td><input type="time" class="form-control form-control-sm bg-transparent text-white border-secondary" value="${row.endTime || ''}" data-idx="${index}" data-field="endTime"></td>
             <td class="text-center">
                 <button class="btn btn-outline-danger btn-sm" onclick="deleteRow(${index})">
-                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                    <i data-lucide="trash" style="width: 14px; height: 14px;"></i>
                 </button>
             </td>
         `;
         tbody.appendChild(tr);
     });
-    lucide.createIcons();
+    try { lucide.createIcons(); } catch(e) { console.warn(e); }
     attachInputListeners();
 }
 
@@ -230,13 +230,13 @@ btnSave.addEventListener('click', async () => {
         
         btnSave.innerHTML = `<i data-lucide="check"></i> Saved ${branch} (${organization}) to Cloud!`;
         btnSave.classList.replace('btn-primary', 'btn-success');
-        lucide.createIcons();
+        try { lucide.createIcons(); } catch(e) { console.warn(e); }
         
         setTimeout(() => {
             btnSave.innerHTML = '<i data-lucide="save"></i> Save Changes to Database';
             btnSave.classList.replace('btn-success', 'btn-primary');
             btnSave.disabled = false;
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch(e) { console.warn(e); }
         }, 2000);
     } catch (e) {
         alert("Error saving to Firebase: " + e.message);
@@ -356,7 +356,7 @@ function renderGrid() {
     }
     
     if (window.lucide) {
-        lucide.createIcons({ root: ccGrid });
+        try { lucide.createIcons({ root: ccGrid }); } catch(e) { console.warn(e); }
     }
     updateUptimes();
 }

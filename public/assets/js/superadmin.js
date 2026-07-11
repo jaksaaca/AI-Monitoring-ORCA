@@ -66,8 +66,8 @@ if (btnFetchData) {
             alert("Gagal menarik data dari server.");
         } finally {
             btnFetchData.disabled = false;
-            btnFetchData.innerHTML = '<i data-lucide="database-zap" style="width: 14px;"></i> Fetch';
-            lucide.createIcons();
+            btnFetchData.innerHTML = '<i data-lucide="database" style="width: 14px;"></i> Fetch';
+            try { lucide.createIcons(); } catch(e) { console.warn(e); }
         }
     });
 }
@@ -235,7 +235,7 @@ function renderLogs() {
             <td class="fw-medium text-white">${l.brand || '-'}</td>
             <td>${l.platform || '-'}</td>
             <td class="text-uppercase fw-semibold text-white">${l.host_name || '-'}</td>
-            <td class="fw-bold ${l.face_detected_pct < 50 ? 'text-danger' : 'text-success'}">${l.face_detected_pct}</td>
+            <td class="fw-bold ${l.facing_camera_pct < 50 ? 'text-danger' : 'text-success'}">${l.facing_camera_pct}</td>
             <td class="fw-bold ${l.speaking_pct < 20 ? 'text-warning' : 'text-success'}">${l.speaking_pct}</td>
             <td>
                 <div class="d-flex justify-content-center gap-1">
@@ -243,17 +243,17 @@ function renderLogs() {
                         <i data-lucide="eye" style="width: 12px; height: 12px;"></i> Detail
                     </button>
                     <button class="btn btn-sm text-dark d-flex align-items-center gap-1 px-2 py-1 shadow-sm" style="background-color: #F59E0B; border-radius: 4px; font-size: 0.75rem; font-weight: 500;" onclick="alert('Edit feature coming soon')">
-                        <i data-lucide="edit-2" style="width: 12px; height: 12px;"></i> Edit
+                        <i data-lucide="edit" style="width: 12px; height: 12px;"></i> Edit
                     </button>
                     <button class="btn btn-sm text-white d-flex align-items-center gap-1 px-2 py-1 shadow-sm" style="background-color: #EF4444; border-radius: 4px; font-size: 0.75rem;" onclick="deleteLog('${l.id}')">
-                        <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i> Delete
+                        <i data-lucide="trash" style="width: 12px; height: 12px;"></i> Delete
                     </button>
                 </div>
             </td>
         </tr>
         `;
     }).join('');
-    lucide.createIcons();
+    try { lucide.createIcons(); } catch(e) { console.warn(e); }
     
     const endCount = Math.min(startIndex + itemsPerPage, filteredLogs.length);
     document.getElementById('pagination-info').textContent = `Showing ${startIndex + 1} to ${endCount} of ${filteredLogs.length} entries`;
@@ -411,12 +411,12 @@ async function loadAccounts() {
                 <td class="text-secondary small">${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}</td>
                 <td class="pe-4 text-end">
                     <button class="btn btn-outline-danger btn-sm" onclick="deleteAccount('${u.id}', '${u.username}')" ${u.username === authData.username ? 'disabled' : ''}>
-                        <i data-lucide="trash-2" style="width: 14px;"></i>
+                        <i data-lucide="trash" style="width: 14px;"></i>
                     </button>
                 </td>
             </tr>
         `).join('');
-        lucide.createIcons();
+        try { lucide.createIcons(); } catch(e) { console.warn(e); }
     } catch (e) {
         tbodyUsers.innerHTML = `<tr><td colspan="4" class="text-danger text-center">Error loading accounts: ${e.message}</td></tr>`;
     }
@@ -521,9 +521,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (e) {
                     alert("Error deleting multiple schedules: " + e.message);
                 } finally {
-                    btnDeleteMultiple.innerHTML = '<i data-lucide="trash-2" style="width: 16px;"></i> Delete Multiple Schedules';
+                    btnDeleteMultiple.innerHTML = '<i data-lucide="trash" style="width: 16px;"></i> Delete Multiple Schedules';
                     btnDeleteMultiple.disabled = true; // Still disabled because selection is gone
-                    if (window.lucide) window.lucide.createIcons();
+                    if (window.lucide) {
+                        try { window.lucide.createIcons(); } catch(e) { console.warn(e); }
+                    }
                 }
             }
         });

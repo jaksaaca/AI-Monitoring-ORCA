@@ -118,7 +118,9 @@ async function initialize() {
                     <i data-lucide="map-pin" class="icon-sm me-2"></i> ${b.name} Studio
                 </button>
             `).join('');
-            if (window.lucide) lucide.createIcons({ root: branchBtnContainer });
+            if (window.lucide) {
+                try { lucide.createIcons({ root: branchBtnContainer }); } catch(e) { console.warn(e); }
+            }
         }
 
         if (!currentBranch) {
@@ -814,7 +816,7 @@ btnStop.addEventListener('click', async () => {
     document.getElementById('endSessionMessage').textContent = msg;
     const endModal = new bootstrap.Modal(document.getElementById('endSessionModal'));
     endModal.show();
-    lucide.createIcons();
+    try { lucide.createIcons(); } catch(e) { console.warn(e); }
 });
 
 // Camera switch
