@@ -577,6 +577,11 @@ studioSelect.addEventListener('change', () => {
         }
     }
     
+    // LITE OPTIMIZATION: Fallback untuk Testing. Jika tidak ada jadwal yang pas dengan waktu sekarang, gunakan jadwal pertama hari ini.
+    if (!matched && todaySchedules.length > 0) {
+        matched = todaySchedules[0];
+    }
+    
     if (matched) {
         activeSchedule = matched;
         infoHost.textContent = matched.hostName;
@@ -608,18 +613,18 @@ setInterval(() => {
 // Start Session
 btnStart.addEventListener('click', async () => {
     if (!studioSelect.value) {
-        alert("Please select a Studio first.");
+        showUIError("Please select a Studio first.");
         return;
     }
     if (!activeSchedule) {
-        alert("No valid schedule found for this studio. Please check Master Control.");
+        showUIError("No valid schedule found for this studio. Please check Master Control.");
         return;
     }
 
     const studioName = activeSchedule.studio;
     const statusData = currentStudioStatuses[studioName];
     if (statusData && statusData.status === 'active') {
-        const force = confirm(`WARNING: Studio [${studioName}] is currently IN USE by another operator!\n\nDo you want to FORCE TAKE OVER this studio? (Hanya gunakan jika studio tersangkut / error)`);
+        const force = window.confirm(`WARNING: Studio [${studioName}] is currently IN USE by another operator!\n\nDo you want to FORCE TAKE OVER this studio? (Hanya gunakan jika studio tersangkut / error)`);
         if (!force) return;
     }
 
@@ -646,7 +651,7 @@ btnStart.addEventListener('click', async () => {
         isSessionActive = true;
     } catch (e) {
         console.error("Start Session Error:", e);
-        alert("Failed to start session: " + e.message);
+        showUIError("Failed to start session: " + e.message);
         return;
     }
     
@@ -761,7 +766,7 @@ btnStop.addEventListener('click', async () => {
         localStorage.removeItem('orca_backup_session');
     } catch (e) {
         console.error("Stop Session Save Error:", e);
-        alert("Warning: Could not save session log to cloud.\nError: " + e.message + "\n\nData has been saved locally and will be uploaded when you refresh the page.");
+        showUIError("Warning: Could not save session log to cloud.\nError: " + e.message + "\n\nData has been saved locally.");
     }
     
     // Always stop the interval and clear active studio state so UI can reset
@@ -860,6 +865,22 @@ window.addEventListener('unload', () => {
         setStudioStatus(currentBranch, activeSchedule.studio, { status: 'idle' });
     }
 });
+
+// UI Helper to avoid browser blocking alerts
+function showUIError(msg) {
+    const existing = document.getElementById('custom-ui-error');
+    if (existing) existing.remove();
+    const alertDiv = document.createElement('div');
+    alertDiv.id = 'custom-ui-error';
+    alertDiv.className = 'alert alert-danger alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-4 shadow';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        <strong>Perhatian:</strong> ${msg}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => { if (alertDiv.parentElement) alertDiv.remove(); }, 5000);
+}
 
 // Update Studio Dropdown Disabled States
 function updateStudioDropdown() {
