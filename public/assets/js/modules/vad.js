@@ -16,6 +16,8 @@ let _isSpeaking = false;
 let _threshold = 0.02;
 let _currentRms = 0;
 let _rafId = null;
+let _holdTimer = null;
+const HOLD_TIME_MS = 1000;
 
 /**
  * Start VAD from a given media stream (or request one).
@@ -26,7 +28,16 @@ export async function start(deviceId = null) {
 
     try {
         const constraints = {
-            audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+            audio: deviceId ? { 
+                deviceId: { exact: deviceId },
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            } : {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            },
             video: false
         };
         mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -63,7 +74,23 @@ export async function start(deviceId = null) {
                 sum += timeDomainBuf[i] * timeDomainBuf[i];
             }
             _currentRms = Math.sqrt(sum / timeDomainBuf.length);
-            _isSpeaking = _currentRms > _threshold;
+            
+            // Logika Hold-Time (Hysteresis)
+            if (_currentRms > _threshold) {
+                _isSpeaking = true;
+                if (_holdTimer) {
+                    clearTimeout(_holdTimer);
+                    _holdTimer = null;
+                }
+            } else {
+                if (_isSpeaking && !_holdTimer) {
+                    _holdTimer = setTimeout(() => {
+                        _isSpeaking = false;
+                        _holdTimer = null;
+                    }, HOLD_TIME_MS);
+                }
+            }
+
             _rafId = requestAnimationFrame(pollRms);
         };
         _rafId = requestAnimationFrame(pollRms);
@@ -81,6 +108,10 @@ export function stop() {
     if (_rafId) {
         cancelAnimationFrame(_rafId);
         _rafId = null;
+    }
+    if (_holdTimer) {
+        clearTimeout(_holdTimer);
+        _holdTimer = null;
     }
     if (mediaStream) {
         mediaStream.getTracks().forEach(t => t.stop());

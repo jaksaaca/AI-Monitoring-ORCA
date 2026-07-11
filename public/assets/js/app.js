@@ -552,6 +552,13 @@ studioSelect.addEventListener('change', () => {
 // EVENT LISTENERS
 // ============================================
 
+// Auto-refresh jadwal studio setiap 1 menit agar realtime bergeser
+setInterval(() => {
+    if (!isSessionActive && studioSelect.value) {
+        studioSelect.dispatchEvent(new Event('change'));
+    }
+}, 60000);
+
 // Start Session
 btnStart.addEventListener('click', async () => {
     if (!studioSelect.value) {
@@ -759,10 +766,19 @@ micSelect.addEventListener('change', async () => {
 });
 
 // VAD threshold slider
+// Load saved VAD value or default to 0.02
+const savedVad = localStorage.getItem('orca_vad_threshold');
+if (savedVad) {
+    vadSlider.value = savedVad;
+    vadVal.textContent = parseFloat(savedVad).toFixed(3);
+    VAD.setThreshold(savedVad);
+}
+
 vadSlider.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
     vadVal.textContent = val.toFixed(3);
     VAD.setThreshold(val);
+    localStorage.setItem('orca_vad_threshold', val);
 });
 
 // Enable camera button (for initial permission)

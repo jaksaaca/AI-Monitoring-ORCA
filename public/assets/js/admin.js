@@ -268,12 +268,24 @@ let uptimeInterval = null;
 function initCommandCenter() {
     if (!ccBranch || !ccGrid) return;
     
-    ccBranch.addEventListener('change', listenToStatus);
+    // Restore branch from memory if exists
+    const savedBranch = localStorage.getItem('orca_admin_branch');
+    if (savedBranch) {
+        ccBranch.value = savedBranch;
+    }
+    
+    ccBranch.addEventListener('change', () => {
+        localStorage.setItem('orca_admin_branch', ccBranch.value);
+        listenToStatus();
+    });
     listenToStatus();
     
     // Start uptime ticking
     if (uptimeInterval) clearInterval(uptimeInterval);
     uptimeInterval = setInterval(updateUptimes, 1000);
+    
+    // Force grid re-render every 5 seconds to catch timeouts
+    setInterval(renderGrid, 5000);
 }
 
 function listenToStatus() {
@@ -297,6 +309,14 @@ function renderGrid() {
         const statusData = currentStatuses[studioName] || { status: 'idle' };
         let isActive = statusData.status === 'active';
         
+        // Timeout check: if no heartbeat in the last 15 seconds, mark as idle
+        if (isActive && statusData.updatedAt) {
+            const now = new Date().getTime();
+            if (now - statusData.updatedAt > 15000) {
+                isActive = false;
+            }
+        }
+
 
         
         const cardCol = document.createElement('div');
