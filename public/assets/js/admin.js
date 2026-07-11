@@ -295,7 +295,16 @@ function renderGrid() {
         const suffix = branch === 'Bandung' ? 'BDG' : 'JKT';
         const studioName = `Studio ${i} ${suffix}`;
         const statusData = currentStatuses[studioName] || { status: 'idle' };
-        const isActive = statusData.status === 'active';
+        let isActive = statusData.status === 'active';
+        
+        // Timeout check (Heartbeat detection)
+        if (isActive && statusData.updatedAt) {
+            const timeSinceLastPing = new Date().getTime() - statusData.updatedAt;
+            // If no ping for 30 seconds (30000 ms), consider it dead/offline
+            if (timeSinceLastPing > 30000) {
+                isActive = false;
+            }
+        }
         
         const cardCol = document.createElement('div');
         cardCol.className = 'col-xl-2 col-lg-3 col-md-4 col-sm-6';
