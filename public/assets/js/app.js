@@ -629,9 +629,9 @@ btnStart.addEventListener('click', async () => {
         setStudioStatus(currentBranch, activeSchedule.studio, {
             status: 'active',
             org: activeSchedule.organization || '',
-            brand: activeSchedule.brand,
-            host: activeSchedule.hostName,
-            scheduleTime: `${activeSchedule.startTime} - ${activeSchedule.endTime}`
+            brand: activeSchedule.brand || '',
+            host: activeSchedule.hostName || '',
+            scheduleTime: `${activeSchedule.startTime || ''} - ${activeSchedule.endTime || ''}`
         });
 
         

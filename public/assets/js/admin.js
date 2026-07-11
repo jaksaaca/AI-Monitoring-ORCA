@@ -273,7 +273,7 @@ function initCommandCenter() {
     
     // Start uptime ticking
     if (uptimeInterval) clearInterval(uptimeInterval);
-    uptimeInterval = setInterval(updateUptimes, 1000);
+    uptimeInterval = setInterval(() => { updateUptimes(); renderGrid(); }, 5000);
 }
 
 function listenToStatus() {
