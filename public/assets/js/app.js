@@ -632,17 +632,23 @@ btnStart.addEventListener('click', async () => {
         end_program: activeSchedule.endTime,
     };
 
-    // Claim Studio
-    await setStudioStatus(currentBranch, studioName, {
-        status: 'active',
-        org: activeSchedule.organization || '',
-        brand: activeSchedule.brand || '',
-        host: activeSchedule.hostName || '',
-        operator: sessionStorage.getItem('orca_user') || 'Unknown'
-    });
+    try {
+        // Claim Studio
+        await setStudioStatus(currentBranch, studioName, {
+            status: 'active',
+            org: activeSchedule.organization || '',
+            brand: activeSchedule.brand || '',
+            host: activeSchedule.hostName || '',
+            operator: sessionStorage.getItem('orca_user') || 'Unknown'
+        });
 
-    Session.startSession(meta);
-    isSessionActive = true;
+        Session.startSession(meta);
+        isSessionActive = true;
+    } catch (e) {
+        console.error("Start Session Error:", e);
+        alert("Failed to start session: " + e.message);
+        return;
+    }
     
     // Auto-Release Tracker
     sessionStorage.setItem('orca_active_studio', studioName);
@@ -754,6 +760,7 @@ btnStop.addEventListener('click', async () => {
         // Clear backups only if saved successfully
         localStorage.removeItem('orca_backup_session');
     } catch (e) {
+        console.error("Stop Session Save Error:", e);
         alert("Warning: Could not save session log to cloud.\nError: " + e.message + "\n\nData has been saved locally and will be uploaded when you refresh the page.");
     }
     
@@ -761,14 +768,19 @@ btnStop.addEventListener('click', async () => {
     if (backupInterval) clearInterval(backupInterval);
     sessionStorage.removeItem('orca_active_studio');
 
-    // Release Studio
-    await setStudioStatus(currentBranch, activeSchedule.studio, {
-        status: 'idle',
-        org: '',
-        brand: '',
-        host: '',
-        operator: ''
-    });
+    try {
+        // Release Studio
+        await setStudioStatus(currentBranch, activeSchedule.studio, {
+            status: 'idle',
+            org: '',
+            brand: '',
+            host: '',
+            operator: ''
+        });
+    } catch (e) {
+        console.error("Stop Session Release Error:", e);
+        // Don't alert here, it's just a status update
+    }
 
     // Unlock form
     btnStart.disabled = false;
