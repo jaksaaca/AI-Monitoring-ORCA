@@ -273,7 +273,7 @@ function initCommandCenter() {
     
     // Start uptime ticking
     if (uptimeInterval) clearInterval(uptimeInterval);
-    uptimeInterval = setInterval(() => { updateUptimes(); renderGrid(); }, 5000);
+    uptimeInterval = setInterval(updateUptimes, 1000);
 }
 
 function listenToStatus() {
@@ -297,16 +297,7 @@ function renderGrid() {
         const statusData = currentStatuses[studioName] || { status: 'idle' };
         let isActive = statusData.status === 'active';
         
-        // Timeout check (Heartbeat detection)
-        if (isActive && statusData.updatedAt) {
-            const timeSinceLastPing = new Date().getTime() - statusData.updatedAt;
-            // Jika selisih waktu lebih dari 3 menit (180000 ms), anggap PC mati.
-            // Toleransi 3 menit sangat penting karena jam di PC Admin dan PC Studio seringkali tidak sinkron.
-            // Jika kita pasang 30 detik, PC yang jamnya telat 1 menit akan dianggap mati padahal sedang live.
-            if (timeSinceLastPing > 180000 || timeSinceLastPing < -180000) {
-                isActive = false;
-            }
-        }
+
         
         const cardCol = document.createElement('div');
         cardCol.className = 'col-xl-2 col-lg-3 col-md-4 col-sm-6';
