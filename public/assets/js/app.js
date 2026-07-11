@@ -623,7 +623,17 @@ btnStart.addEventListener('click', async () => {
             speaking_seconds: stats.speaking_seconds,
             speaking_pct: Math.round((stats.speaking_seconds / Math.max(1, stats.total_duration_seconds)) * 100)
         };
-        localStorage.setItem('orca_backup_session', JSON.stringify(logData));
+                localStorage.setItem('orca_backup_session', JSON.stringify(logData));
+        
+        // HEARTBEAT PING: Send active status to Firebase every 5 seconds
+        setStudioStatus(currentBranch, activeSchedule.studio, {
+            status: 'active',
+            org: activeSchedule.organization || '',
+            brand: activeSchedule.brand,
+            host: activeSchedule.hostName,
+            scheduleTime: `${activeSchedule.startTime} - ${activeSchedule.endTime}`
+        });
+
         
         // Auto-Stop Check: 15 minutes past schedule end
         if (activeSchedule && activeSchedule.endTime) {

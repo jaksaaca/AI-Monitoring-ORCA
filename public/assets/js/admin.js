@@ -310,6 +310,9 @@ function renderGrid() {
                     <div class="mt-3">
                         <h6 class="mb-0 text-white fw-bold brand-font" style="letter-spacing: 1px;">${isActive ? (statusData.brand || '-') : '-'}</h6>
                         <small class="text-secondary">${isActive ? (statusData.host || '-') : '-'}</small>
+                        <small class="text-info mt-1 d-block" style="font-size: 0.75rem;">
+                            ${isActive && statusData.scheduleTime ? '<i data-lucide="clock" style="width: 12px; height: 12px;"></i> ' + statusData.scheduleTime : ''}
+                        </small>
                     </div>
                     <div class="mt-auto pt-3 d-flex justify-content-end align-items-center border-top border-secondary mt-3">
                         <small class="text-info font-monospace fw-bold uptime-clock" data-time="${isActive ? statusData.updatedAt : ''}">
