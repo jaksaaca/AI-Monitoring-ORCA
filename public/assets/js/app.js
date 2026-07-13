@@ -184,7 +184,10 @@ async function initialize() {
         listenToSchedule((data) => {
             scheduleDb = data;
             if (currentBranch) {
-                populateStudios();
+                // Do not disrupt the dropdown if a session is currently active
+                if (!isSessionActive) {
+                    populateStudios();
+                }
                 
                 // Also listen to studio statuses for anti-overlap
                 if (unsubscribeStudioStatus) unsubscribeStudioStatus();
@@ -507,6 +510,7 @@ function populateStudios() {
         updateStudioDropdown();
     } else {
         studioSelect.innerHTML = '<option value="" disabled selected>No Schedule Uploaded for ' + currentBranch + '</option>';
+        studioSelect.innerHTML += '<option value="Test Studio">Test Studio (Ad-hoc Testing)</option>';
         infoHost.textContent = "-";
         infoBrand.textContent = "-";
         infoDate.textContent = "-";
@@ -530,6 +534,27 @@ studioSelect.addEventListener('change', () => {
     );
     
     if (studioSchedules.length === 0) {
+        if (studio === "Test Studio") {
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            activeSchedule = {
+                studio: 'Test Studio',
+                brand: 'Ad-hoc Testing',
+                hostName: 'Test Host',
+                location: currentBranch,
+                startTime: '00:00',
+                endTime: '23:59',
+                organization: 'Local Testing',
+                platform: 'Web',
+                date: todayStr
+            };
+            infoHost.textContent = activeSchedule.hostName;
+            infoBrand.textContent = activeSchedule.brand;
+            infoDate.textContent = activeSchedule.date;
+            infoTime.textContent = "Ad-hoc Testing";
+            return;
+        }
+
         infoHost.textContent = "No Schedule Found";
         infoBrand.textContent = "-";
         infoDate.textContent = "-";
@@ -612,6 +637,9 @@ setInterval(() => {
     }
 }, 60000);
 
+// Protect the active schedule by cloning it at the start of the session
+let currentSessionData = null;
+
 // Start Session
 btnStart.addEventListener('click', async () => {
     if (!studioSelect.value) {
@@ -630,13 +658,15 @@ btnStart.addEventListener('click', async () => {
         if (!force) return;
     }
 
+    currentSessionData = { ...activeSchedule }; // clone to avoid mutation if schedules refresh
+
     const meta = {
-        brand: activeSchedule.brand,
-        studio: activeSchedule.studio,
-        host_name: activeSchedule.hostName,
-        location: activeSchedule.location,
-        start_program: activeSchedule.startTime,
-        end_program: activeSchedule.endTime,
+        brand: currentSessionData.brand,
+        studio: currentSessionData.studio,
+        host_name: currentSessionData.hostName,
+        location: currentSessionData.location,
+        start_program: currentSessionData.startTime,
+        end_program: currentSessionData.endTime,
     };
 
     try {
@@ -666,15 +696,15 @@ btnStart.addEventListener('click', async () => {
         const stats = Session.getStats();
         const logData = {
             branch: currentBranch,
-            organization: activeSchedule.organization || 'Unknown',
-            dateDay: activeSchedule.date || new Date().toLocaleDateString('en-GB'),
-            lsTime: `${activeSchedule.startTime} - ${activeSchedule.endTime}`,
-            host_name: activeSchedule.hostName,
-            brand: activeSchedule.brand,
-            platform: activeSchedule.platform || '-',
-            studio_id: activeSchedule.studio,
-            location: activeSchedule.location,
-            program_schedule: activeSchedule.startTime,
+            organization: currentSessionData.organization || 'Unknown',
+            dateDay: currentSessionData.date || new Date().toLocaleDateString('en-GB'),
+            lsTime: `${currentSessionData.startTime} - ${currentSessionData.endTime}`,
+            host_name: currentSessionData.hostName,
+            brand: currentSessionData.brand,
+            platform: currentSessionData.platform || '-',
+            studio_id: currentSessionData.studio,
+            location: currentSessionData.location,
+            program_schedule: currentSessionData.startTime,
             total_duration_seconds: stats.total_duration_seconds,
             face_detected_seconds: stats.face_detected_seconds,
             face_detected_pct: Math.round((stats.face_detected_seconds / Math.max(1, stats.total_duration_seconds)) * 100),
@@ -692,20 +722,20 @@ btnStart.addEventListener('click', async () => {
                 localStorage.setItem('orca_backup_session', JSON.stringify(logData));
         
         // HEARTBEAT PING: Send active status to Firebase every 5 seconds
-        setStudioStatus(currentBranch, activeSchedule.studio, {
+        setStudioStatus(currentBranch, currentSessionData.studio, {
             status: 'active',
-            org: activeSchedule.organization || '',
-            brand: activeSchedule.brand || '',
-            host: activeSchedule.hostName || '',
-            scheduleTime: `${activeSchedule.startTime || ''} - ${activeSchedule.endTime || ''}`
+            org: currentSessionData.organization || '',
+            brand: currentSessionData.brand || '',
+            host: currentSessionData.hostName || '',
+            scheduleTime: `${currentSessionData.startTime || ''} - ${currentSessionData.endTime || ''}`
         });
 
         
         // Auto-Stop Check: 15 minutes past schedule end
-        if (activeSchedule && activeSchedule.endTime) {
+        if (currentSessionData && currentSessionData.endTime) {
             const now = new Date();
             const currentMs = (now.getHours() * 3600000) + (now.getMinutes() * 60000);
-            const endParts = activeSchedule.endTime.split(':');
+            const endParts = currentSessionData.endTime.split(':');
             const endMs = (parseInt(endParts[0]) * 3600000) + (parseInt(endParts[1]) * 60000);
             
             // 15 minutes = 900000 ms
@@ -738,15 +768,15 @@ btnStop.addEventListener('click', async () => {
     // Save to Firebase Cloud
     const logData = {
         branch: currentBranch,
-        organization: activeSchedule.organization || 'Unknown',
-        dateDay: activeSchedule.date || new Date().toLocaleDateString('en-GB'),
-        lsTime: `${activeSchedule.startTime} - ${activeSchedule.endTime}`,
-        host_name: activeSchedule.hostName,
-        brand: activeSchedule.brand,
-        platform: activeSchedule.platform || '-',
-        studio_id: activeSchedule.studio,
-        location: activeSchedule.location,
-        program_schedule: activeSchedule.startTime,
+        organization: currentSessionData.organization || 'Unknown',
+        dateDay: currentSessionData.date || new Date().toLocaleDateString('en-GB'),
+        lsTime: `${currentSessionData.startTime} - ${currentSessionData.endTime}`,
+        host_name: currentSessionData.hostName,
+        brand: currentSessionData.brand,
+        platform: currentSessionData.platform || '-',
+        studio_id: currentSessionData.studio,
+        location: currentSessionData.location,
+        program_schedule: currentSessionData.startTime,
         total_duration_seconds: stats.total_duration_seconds,
         face_detected_seconds: stats.face_detected_seconds,
         face_detected_pct: Math.round((stats.face_detected_seconds / Math.max(1, stats.total_duration_seconds)) * 100),
@@ -777,7 +807,7 @@ btnStop.addEventListener('click', async () => {
 
     try {
         // Release Studio
-        await setStudioStatus(currentBranch, activeSchedule.studio, {
+        await setStudioStatus(currentBranch, currentSessionData.studio, {
             status: 'idle',
             org: '',
             brand: '',
