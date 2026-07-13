@@ -707,6 +707,22 @@ btnStart.addEventListener('click', async () => {
     // Auto-Save Interval (Backup every 5 seconds in case of crash)
     if (backupInterval) workerClearInterval(backupInterval);
     backupInterval = workerSetInterval(() => {
+        // Auto-Stop Check (Do this FIRST to prevent race condition with heartbeat)
+        if (autoStopEnabled && currentSessionData && currentSessionData.endTime) {
+            const now = new Date();
+            const currentMs = (now.getHours() * 3600000) + (now.getMinutes() * 60000);
+            const endParts = currentSessionData.endTime.split(':');
+            const endMs = (parseInt(endParts[0]) * 3600000) + (parseInt(endParts[1]) * 60000);
+            
+            // 15 minutes = 900000 ms
+            if (currentMs >= endMs + 900000) {
+                console.log("[Auto-Stop] Session exceeded 15 minutes past schedule end.");
+                window._isAutoStop = true;
+                btnStop.click();
+                return; // Abort further execution so we don't send an 'active' heartbeat
+            }
+        }
+
         const stats = Session.getStats();
         const logData = {
             branch: currentBranch,
@@ -733,7 +749,7 @@ btnStart.addEventListener('click', async () => {
             speaking_seconds: stats.speaking_seconds,
             speaking_pct: Math.round((stats.speaking_seconds / Math.max(1, stats.total_duration_seconds)) * 100)
         };
-                localStorage.setItem('orca_backup_session', JSON.stringify(logData));
+        localStorage.setItem('orca_backup_session', JSON.stringify(logData));
         
         // HEARTBEAT PING: Send active status to Firebase every 5 seconds
         setStudioStatus(currentBranch, currentSessionData.studio, {
@@ -743,22 +759,6 @@ btnStart.addEventListener('click', async () => {
             host: currentSessionData.hostName || '',
             scheduleTime: `${currentSessionData.startTime || ''} - ${currentSessionData.endTime || ''}`
         });
-
-        
-        // Auto-Stop Check: 15 minutes past schedule end
-        if (autoStopEnabled && currentSessionData && currentSessionData.endTime) {
-            const now = new Date();
-            const currentMs = (now.getHours() * 3600000) + (now.getMinutes() * 60000);
-            const endParts = currentSessionData.endTime.split(':');
-            const endMs = (parseInt(endParts[0]) * 3600000) + (parseInt(endParts[1]) * 60000);
-            
-            // 15 minutes = 900000 ms
-            if (currentMs >= endMs + 900000) {
-                console.log("[Auto-Stop] Session exceeded 15 minutes past schedule end.");
-                window._isAutoStop = true;
-                btnStop.click();
-            }
-        }
     }, 5000);
 
     // Lock form
