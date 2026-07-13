@@ -41,7 +41,7 @@ const callbacks = {};
 worker.onmessage = function(e) {
     const id = e.data.id;
     if (callbacks[id]) {
-        callbacks[id].fn();
+        callbacks[id].fn(performance.now());
         
         // If it was a timeout (not an interval), clean up the callback
         if (!callbacks[id].isInterval) {
