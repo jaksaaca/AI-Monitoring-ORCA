@@ -695,8 +695,8 @@ btnStart.addEventListener('click', async () => {
         const endParts = currentSessionData.endTime.split(':');
         const endMs = (parseInt(endParts[0]) * 3600000) + (parseInt(endParts[1]) * 60000);
         
-        // If they are intentionally starting a session that is ALREADY 15 mins late, disable auto-stop
-        if (currentMs >= endMs + 900000) {
+        // If they are intentionally starting a session that is ALREADY late (past schedule end time), disable auto-stop
+        if (currentMs >= endMs) {
             autoStopEnabled = false;
         }
     }
@@ -714,9 +714,9 @@ btnStart.addEventListener('click', async () => {
             const endParts = currentSessionData.endTime.split(':');
             const endMs = (parseInt(endParts[0]) * 3600000) + (parseInt(endParts[1]) * 60000);
             
-            // 15 minutes = 900000 ms
-            if (currentMs >= endMs + 900000) {
-                console.log("[Auto-Stop] Session exceeded 15 minutes past schedule end.");
+            // Auto stop exactly when schedule ends
+            if (currentMs >= endMs) {
+                console.log("[Auto-Stop] Session reached schedule end time.");
                 window._isAutoStop = true;
                 btnStop.click();
                 return; // Abort further execution so we don't send an 'active' heartbeat
@@ -853,7 +853,7 @@ btnStop.addEventListener('click', async () => {
 
     let msg = 'Sesi ditutup secara manual oleh operator. Data telah aman disimpan ke Cloud.';
     if (window._isAutoStop) {
-        msg = 'Sesi ini dihentikan OTOMATIS karena melewati batas toleransi 15 menit dari jadwal. Data telah diamankan.';
+        msg = 'Sesi ini dihentikan OTOMATIS karena jadwal program telah habis. Data telah diamankan.';
         window._isAutoStop = false; // reset
     }
     
