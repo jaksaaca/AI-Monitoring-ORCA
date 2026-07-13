@@ -191,3 +191,16 @@ export async function deleteSessionLog(docId) {
         throw e;
     }
 }
+
+// ==========================================
+// 5. SYSTEM COMMANDS (GOD-MODE)
+// ==========================================
+
+export function listenToGlobalCommands(callback) {
+    const docRef = doc(db, "system_commands", "global");
+    return onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+            callback(docSnap.data());
+        }
+    });
+}

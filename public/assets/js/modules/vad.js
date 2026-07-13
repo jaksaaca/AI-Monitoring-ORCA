@@ -6,6 +6,7 @@
  *  Author: Jaksa Setia Alam
  * ================================================
  */
+import { workerRequestAnimationFrame, workerCancelAnimationFrame } from './worker-timer.js';
 
 let audioCtx = null;
 let analyser = null;
@@ -104,9 +105,9 @@ export async function start(deviceId = null) {
                 }
             }
 
-            _rafId = requestAnimationFrame(pollRms);
+            _rafId = workerRequestAnimationFrame(pollRms);
         };
-        _rafId = requestAnimationFrame(pollRms);
+        _rafId = workerRequestAnimationFrame(pollRms);
 
         console.log('[VAD] Started successfully.');
     } catch (e) {
@@ -119,7 +120,7 @@ export async function start(deviceId = null) {
  */
 export function stop() {
     if (_rafId) {
-        cancelAnimationFrame(_rafId);
+        workerCancelAnimationFrame(_rafId);
         _rafId = null;
     }
     if (_holdTimer) {

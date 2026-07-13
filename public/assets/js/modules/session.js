@@ -9,6 +9,7 @@
  */
 
 import { playSoftWarning } from './audio-warning.js';
+import { workerSetInterval, workerClearInterval } from './worker-timer.js';
 
 let isActive = false;
 let intervalId = null;
@@ -67,7 +68,7 @@ export function startSession(meta) {
     isActive = true;
 
     // Start 1Hz tracker (equivalent to Python tracker_thread_func)
-    intervalId = setInterval(trackerTick, 1000);
+    intervalId = workerSetInterval(trackerTick, 1000);
 }
 
 /**
@@ -77,7 +78,7 @@ export function startSession(meta) {
 export function stopSession() {
     isActive = false;
     if (intervalId) {
-        clearInterval(intervalId);
+        workerClearInterval(intervalId);
         intervalId = null;
     }
     silentSeconds = 0;
@@ -89,13 +90,6 @@ export function stopSession() {
  */
 function trackerTick() {
     if (!isActive) return;
-
-    // When the tab is hidden/minimized, VAD's RAF loop stops running,
-    // so _isSpeaking freezes at its last value (usually false).
-    // This would cause silentSeconds to grow indefinitely and trigger
-    // the warning beep even though the operator is not at the desk.
-    // Solution: skip stat counting AND warning when tab is not visible.
-    if (document.hidden) return;
 
     stats.total_duration_seconds += 1;
 

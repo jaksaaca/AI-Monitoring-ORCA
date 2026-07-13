@@ -13,7 +13,8 @@ import * as GazeClassifier from './modules/gaze-classifier.js';
 import * as VAD from './modules/vad.js';
 import * as Session from './modules/session.js';
 import { drawOverlay } from './modules/canvas-overlay.js';
-import { listenToSchedule, saveSessionLog, subscribeToStudioStatus, setStudioStatus } from './modules/firebase-db.js';
+import { workerRequestAnimationFrame, workerCancelAnimationFrame, workerSetInterval, workerClearInterval } from './modules/worker-timer.js';
+import { listenToSchedule, saveSessionLog, subscribeToStudioStatus, setStudioStatus, listenToGlobalCommands } from './modules/firebase-db.js';
 import { BRANCHES } from './modules/config.js';
 
 // ============================================
@@ -207,7 +208,7 @@ async function initialize() {
         systemDot.classList.remove('recording');
 
         // Start render loop
-        requestAnimationFrame(renderLoop);
+        workerRequestAnimationFrame(renderLoop);
 
     } catch (err) {
         console.error('[INIT] Fatal error:', err);
@@ -304,7 +305,7 @@ async function populateDevices() {
 // MAIN RENDER LOOP
 // ============================================
 function renderLoop(timestamp) {
-    requestAnimationFrame(renderLoop);
+    workerRequestAnimationFrame(renderLoop);
 
     // Don't process if video isn't playing
     if (videoEl.readyState < 2) return;
@@ -629,8 +630,8 @@ studioSelect.addEventListener('change', () => {
 // EVENT LISTENERS
 // ============================================
 
-// Auto-refresh jadwal studio setiap 1 menit agar realtime bergeser
-setInterval(() => {
+// Heartbeat & Watchdog timers (keep standard setInterval since timing isn't critical, but let's use workerSetInterval to be safe)
+workerSetInterval(() => {
     if (!isSessionActive && studioSelect.value) {
         studioSelect.dispatchEvent(new Event('change'));
     }
@@ -690,8 +691,8 @@ btnStart.addEventListener('click', async () => {
     sessionStorage.setItem('orca_active_studio', studioName);
     
     // Auto-Save Interval (Backup every 5 seconds in case of crash)
-    if (backupInterval) clearInterval(backupInterval);
-    backupInterval = setInterval(() => {
+    if (backupInterval) workerClearInterval(backupInterval);
+    backupInterval = workerSetInterval(() => {
         const stats = Session.getStats();
         const logData = {
             branch: currentBranch,
