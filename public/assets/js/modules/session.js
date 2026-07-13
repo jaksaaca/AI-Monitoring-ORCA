@@ -90,6 +90,13 @@ export function stopSession() {
 function trackerTick() {
     if (!isActive) return;
 
+    // When the tab is hidden/minimized, VAD's RAF loop stops running,
+    // so _isSpeaking freezes at its last value (usually false).
+    // This would cause silentSeconds to grow indefinitely and trigger
+    // the warning beep even though the operator is not at the desk.
+    // Solution: skip stat counting AND warning when tab is not visible.
+    if (document.hidden) return;
+
     stats.total_duration_seconds += 1;
 
     if (_faceDetected) {

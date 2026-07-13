@@ -13,7 +13,6 @@ import * as GazeClassifier from './modules/gaze-classifier.js';
 import * as VAD from './modules/vad.js';
 import * as Session from './modules/session.js';
 import { drawOverlay } from './modules/canvas-overlay.js';
-import { playSoftWarning } from './modules/audio-warning.js';
 import { listenToSchedule, saveSessionLog, subscribeToStudioStatus, setStudioStatus } from './modules/firebase-db.js';
 import { BRANCHES } from './modules/config.js';
 
@@ -55,7 +54,7 @@ const videoEl        = document.getElementById('camera-video');
 const canvasEl       = document.getElementById('overlay-canvas');
 const canvasCtx      = canvasEl.getContext('2d');
 
-const form           = document.getElementById('session-form');
+// (session-form element removed — buttons are standalone)
 const btnStart       = document.getElementById('btn-start');
 const btnStop        = document.getElementById('btn-stop');
 const btnEnableCam   = document.getElementById('btn-enable-camera');
@@ -891,10 +890,10 @@ window.addEventListener('beforeunload', (e) => {
 
 // Auto-save on force close
 window.addEventListener('unload', () => {
-    if (isSessionActive) {
-        const { metadata, stats } = Session.stopSession();
-        // Release studio
-        setStudioStatus(currentBranch, activeSchedule.studio, { status: 'idle' });
+    if (isSessionActive && currentSessionData) {
+        Session.stopSession();
+        // Release studio — fire-and-forget (unload gives no time for async)
+        setStudioStatus(currentBranch, currentSessionData.studio, { status: 'idle' });
     }
 });
 
