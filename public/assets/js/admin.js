@@ -317,10 +317,10 @@ function renderGrid() {
         const statusData = currentStatuses[studioName] || { status: 'idle' };
         let isActive = statusData.status === 'active';
         
-        // Timeout check: if no heartbeat in the last 15 seconds, mark as idle
+        // Timeout check: if no heartbeat in the last 75 seconds, mark as idle
         if (isActive && statusData.updatedAt) {
             const now = new Date().getTime();
-            if (now - statusData.updatedAt > 15000) {
+            if (now - statusData.updatedAt > 75000) {
                 isActive = false;
             }
         }

@@ -14,7 +14,7 @@ import * as VAD from './modules/vad.js';
 import * as Session from './modules/session.js';
 import { drawOverlay } from './modules/canvas-overlay.js';
 import { workerRequestAnimationFrame, workerCancelAnimationFrame, workerSetInterval, workerClearInterval } from './modules/worker-timer.js';
-import { listenToSchedule, saveSessionLog, subscribeToStudioStatus, setStudioStatus, listenToGlobalCommands } from './modules/firebase-db.js';
+import { getSchedule, saveSessionLog, subscribeToStudioStatus, setStudioStatus, listenToGlobalCommands } from './modules/firebase-db.js';
 import { BRANCHES } from './modules/config.js';
 
 // ============================================
@@ -180,38 +180,41 @@ async function initialize() {
         // Step 6: Ready
         setLoadingProgress(100, 'System ready!');
         
-        // Listen to schedule from Firebase Cloud
-        listenToSchedule((data) => {
-            scheduleDb = data;
-            if (currentBranch) {
-                // Do not disrupt the dropdown if a session is currently active
-                if (!isSessionActive) {
+        // Load schedule once at startup (Saves thousands of reads compared to realtime)
+        const refreshSchedule = async () => {
+            try {
+                scheduleDb = await getSchedule();
+                if (currentBranch && !isSessionActive) {
                     populateStudios();
                 }
-                
-                // Also listen to studio statuses for anti-overlap and forced take-overs
-                if (unsubscribeStudioStatus) unsubscribeStudioStatus();
-                unsubscribeStudioStatus = subscribeToStudioStatus(currentBranch, (statuses) => {
-                    currentStudioStatuses = statuses;
-                    updateStudioDropdown();
-                    
-                    // KICK OUT LOGIC: If someone else forces a Take Over on our active studio
-                    if (isSessionActive && currentSessionData) {
-                        const myStudio = currentSessionData.studio;
-                        const myName = sessionStorage.getItem('orca_user') || 'Unknown';
-                        const currentStatus = statuses[myStudio];
-                        
-                        // If the studio is active, but the operator registered in Firebase is NOT me...
-                        if (currentStatus && currentStatus.status === 'active' && currentStatus.operator && currentStatus.operator !== myName) {
-                            console.warn(`[KICK OUT] Studio diambil alih oleh ${currentStatus.operator}`);
-                            window._isAutoStop = true;
-                            window._kickOutMessage = `Sesi Anda dihentikan paksa karena Studio diambil alih oleh operator lain (${currentStatus.operator}).`;
-                            btnStop.click();
-                        }
-                    }
-                });
+            } catch (err) {
+                console.warn("[Schedule] Fetch error:", err);
             }
-        });
+        };
+        await refreshSchedule();
+
+        // Listen to studio statuses for anti-overlap and forced take-overs
+        if (currentBranch) {
+            if (unsubscribeStudioStatus) unsubscribeStudioStatus();
+            unsubscribeStudioStatus = subscribeToStudioStatus(currentBranch, (statuses) => {
+                currentStudioStatuses = statuses;
+                updateStudioDropdown();
+                
+                // KICK OUT LOGIC: If someone else forces a Take Over on our active studio
+                if (isSessionActive && currentSessionData) {
+                    const myStudio = currentSessionData.studio;
+                    const myName = sessionStorage.getItem('orca_user') || 'Unknown';
+                    const currentStatus = statuses[myStudio];
+                    
+                    if (currentStatus && currentStatus.status === 'active' && currentStatus.operator && currentStatus.operator !== myName) {
+                        console.warn(`[KICK OUT] Studio diambil alih oleh ${currentStatus.operator}`);
+                        window._isAutoStop = true;
+                        window._kickOutMessage = `Sesi Anda dihentikan paksa karena Studio diambil alih oleh operator lain (${currentStatus.operator}).`;
+                        btnStop.click();
+                    }
+                }
+            });
+        }
 
         // Wait a moment then show app
         await sleep(500);
@@ -663,6 +666,16 @@ workerSetInterval(() => {
     if (!isSessionActive && studioSelect.value) {
         studioSelect.dispatchEvent(new Event('change'));
     }
+
+    // Schedule refresh at minute 55 of every hour
+    const now = new Date();
+    if (now.getMinutes() === 55) {
+        getSchedule().then(data => {
+            scheduleDb = data;
+            if (!isSessionActive && currentBranch) populateStudios();
+            console.log("[Schedule] Auto-refreshed at 55 past the hour.");
+        }).catch(console.error);
+    }
 }, 60000);
 
 // Protect the active schedule by cloning it at the start of the session
@@ -732,8 +745,9 @@ btnStart.addEventListener('click', async () => {
     // Auto-Release Tracker
     sessionStorage.setItem('orca_active_studio', studioName);
     
-    // Auto-Save Interval (Backup every 5 seconds in case of crash)
+    // Auto-Save Interval (Backup every 5 seconds, Heartbeat every 60 seconds to save quota)
     if (backupInterval) workerClearInterval(backupInterval);
+    let tickCount = 0;
     backupInterval = workerSetInterval(() => {
         // Auto-Stop Check (Do this FIRST to prevent race condition with heartbeat)
         if (autoStopEnabled && currentSessionData && currentSessionData.endTime) {
@@ -779,14 +793,18 @@ btnStart.addEventListener('click', async () => {
         };
         localStorage.setItem('orca_backup_session', JSON.stringify(logData));
         
-        // HEARTBEAT PING: Send active status to Firebase every 5 seconds
-        setStudioStatus(currentBranch, currentSessionData.studio, {
-            status: 'active',
-            org: currentSessionData.organization || '',
-            brand: currentSessionData.brand || '',
-            host: currentSessionData.hostName || '',
-            scheduleTime: `${currentSessionData.startTime || ''} - ${currentSessionData.endTime || ''}`
-        });
+        // HEARTBEAT PING: Send active status to Firebase every 60 seconds (12 ticks of 5s)
+        tickCount++;
+        if (tickCount >= 12) {
+            tickCount = 0;
+            setStudioStatus(currentBranch, currentSessionData.studio, {
+                status: 'active',
+                org: currentSessionData.organization || '',
+                brand: currentSessionData.brand || '',
+                host: currentSessionData.hostName || '',
+                scheduleTime: `${currentSessionData.startTime || ''} - ${currentSessionData.endTime || ''}`
+            }).catch(console.error);
+        }
     }, 5000);
 
     // Lock form
@@ -966,14 +984,14 @@ function updateStudioDropdown() {
         const statusData = currentStudioStatuses[opt.value];
         let isActive = statusData && statusData.status === 'active';
         
-        // Heartbeat timeout: if no heartbeat in the last 15 seconds, treat as idle (ghost session)
+        // Heartbeat timeout: if no heartbeat in the last 75 seconds, treat as idle (ghost session)
         if (isActive && statusData.updatedAt) {
             const now = new Date().getTime();
-            if (now - statusData.updatedAt > 15000) {
+            if (now - statusData.updatedAt > 75000) {
                 isActive = false;
                 // Auto-cleanup ghost status in Firebase
                 setStudioStatus(currentBranch, opt.value, { status: 'idle', operator: '' }).catch(console.error);
-                console.log(`[Ghost Cleanup] Studio ${opt.value} auto-released (no heartbeat for >15s)`);
+                console.log(`[Ghost Cleanup] Studio ${opt.value} auto-released (no heartbeat for >75s)`);
             }
         }
         
