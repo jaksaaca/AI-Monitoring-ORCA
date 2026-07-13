@@ -686,6 +686,20 @@ btnStart.addEventListener('click', async () => {
         showUIError("Failed to start session: " + e.message);
         return;
     }
+
+    // Determine if Auto-Stop should be active for this session
+    let autoStopEnabled = true;
+    if (currentSessionData && currentSessionData.endTime) {
+        const now = new Date();
+        const currentMs = (now.getHours() * 3600000) + (now.getMinutes() * 60000);
+        const endParts = currentSessionData.endTime.split(':');
+        const endMs = (parseInt(endParts[0]) * 3600000) + (parseInt(endParts[1]) * 60000);
+        
+        // If they are intentionally starting a session that is ALREADY 15 mins late, disable auto-stop
+        if (currentMs >= endMs + 900000) {
+            autoStopEnabled = false;
+        }
+    }
     
     // Auto-Release Tracker
     sessionStorage.setItem('orca_active_studio', studioName);
@@ -732,7 +746,7 @@ btnStart.addEventListener('click', async () => {
 
         
         // Auto-Stop Check: 15 minutes past schedule end
-        if (currentSessionData && currentSessionData.endTime) {
+        if (autoStopEnabled && currentSessionData && currentSessionData.endTime) {
             const now = new Date();
             const currentMs = (now.getHours() * 3600000) + (now.getMinutes() * 60000);
             const endParts = currentSessionData.endTime.split(':');
@@ -802,7 +816,7 @@ btnStop.addEventListener('click', async () => {
     }
     
     // Always stop the interval and clear active studio state so UI can reset
-    if (backupInterval) clearInterval(backupInterval);
+    if (backupInterval) workerClearInterval(backupInterval);
     sessionStorage.removeItem('orca_active_studio');
 
     try {
