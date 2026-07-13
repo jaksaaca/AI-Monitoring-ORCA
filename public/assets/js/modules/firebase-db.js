@@ -88,21 +88,45 @@ export async function deleteUser(userId) {
 export async function uploadSchedule(scheduleArray, branch, organization) {
     if (!branch || !organization) throw new Error("Branch and Organization are required to upload schedule.");
 
-    // Clear existing schedule ONLY for this branch and organization
-    const q = query(collection(db, "schedules"), 
-                    where("branch", "==", branch), 
-                    where("organization", "==", organization));
-    const snapshot = await getDocs(q);
-    const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
-    await Promise.all(deletePromises);
-    
-    // Add new ones
-    const addPromises = scheduleArray.map(sched => {
-        sched.branch = branch;
-        sched.organization = organization;
-        return addDoc(collection(db, "schedules"), sched);
-    });
-    await Promise.all(addPromises);
+    // Wrap entire operation in a 30-second timeout to prevent infinite hang
+    const timeoutMs = 30000;
+    const uploadTask = async () => {
+        // Step 1: Clear existing schedule ONLY for this branch and organization
+        console.log(`[Upload] Deleting old schedules for ${branch}/${organization}...`);
+        const q = query(collection(db, "schedules"), 
+                        where("branch", "==", branch), 
+                        where("organization", "==", organization));
+        const snapshot = await getDocs(q);
+        
+        // Delete in small batches to avoid Firestore rate limits
+        const BATCH_SIZE = 20;
+        for (let i = 0; i < snapshot.docs.length; i += BATCH_SIZE) {
+            const batch = snapshot.docs.slice(i, i + BATCH_SIZE);
+            await Promise.all(batch.map(d => deleteDoc(d.ref)));
+            console.log(`[Upload] Deleted batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(snapshot.docs.length / BATCH_SIZE)}`);
+        }
+        
+        // Step 2: Add new ones in batches
+        console.log(`[Upload] Adding ${scheduleArray.length} new schedules...`);
+        for (let i = 0; i < scheduleArray.length; i += BATCH_SIZE) {
+            const batch = scheduleArray.slice(i, i + BATCH_SIZE);
+            const addPromises = batch.map(sched => {
+                const docData = { ...sched, branch, organization };
+                return addDoc(collection(db, "schedules"), docData);
+            });
+            await Promise.all(addPromises);
+            console.log(`[Upload] Added batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(scheduleArray.length / BATCH_SIZE)}`);
+        }
+        console.log(`[Upload] Complete!`);
+    };
+
+    // Race between the upload task and a timeout
+    await Promise.race([
+        uploadTask(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error(
+            `Upload timed out after ${timeoutMs / 1000}s. Check your internet connection and try again.`
+        )), timeoutMs))
+    ]);
 }
 
 export async function getSchedule(branch = null, organization = null) {

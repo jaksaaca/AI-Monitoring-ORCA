@@ -508,11 +508,24 @@ const infoDate = document.getElementById('info-date');
 const infoTime = document.getElementById('info-time');
 
 function populateStudios() {
-    // Filter schedule by selected branch
-    const branchSchedule = scheduleDb.filter(s => s.branch === currentBranch);
+    // Debug: log raw schedule data
+    console.log('[Schedule] Raw scheduleDb count:', scheduleDb.length);
+    console.log('[Schedule] Current branch:', currentBranch);
+    if (scheduleDb.length > 0) {
+        console.log('[Schedule] Branches in DB:', [...new Set(scheduleDb.map(s => s.branch))]);
+        console.log('[Schedule] Studios in DB:', [...new Set(scheduleDb.map(s => s.studio))]);
+    }
+
+    // Filter schedule by selected branch (case-insensitive to prevent mismatch)
+    const branchSchedule = scheduleDb.filter(s => 
+        s.branch && s.branch.toLowerCase() === currentBranch.toLowerCase()
+    );
+    
+    console.log('[Schedule] Filtered for branch:', branchSchedule.length, 'schedules');
     
     // Get unique studios from filtered schedule
     const studios = [...new Set(branchSchedule.map(s => s.studio).filter(Boolean))];
+    console.log('[Schedule] Unique studios:', studios);
     
     if (studios.length > 0) {
         studioSelect.innerHTML = '<option value="" disabled selected>Choose Studio...</option>';
@@ -951,7 +964,20 @@ function updateStudioDropdown() {
     Array.from(studioSelect.options).forEach(opt => {
         if (!opt.value) return; // skip placeholder
         const statusData = currentStudioStatuses[opt.value];
-        if (statusData && statusData.status === 'active') {
+        let isActive = statusData && statusData.status === 'active';
+        
+        // Heartbeat timeout: if no heartbeat in the last 15 seconds, treat as idle (ghost session)
+        if (isActive && statusData.updatedAt) {
+            const now = new Date().getTime();
+            if (now - statusData.updatedAt > 15000) {
+                isActive = false;
+                // Auto-cleanup ghost status in Firebase
+                setStudioStatus(currentBranch, opt.value, { status: 'idle', operator: '' }).catch(console.error);
+                console.log(`[Ghost Cleanup] Studio ${opt.value} auto-released (no heartbeat for >15s)`);
+            }
+        }
+        
+        if (isActive) {
             opt.disabled = false; // Allow selection for force takeover
             opt.textContent = `${opt.value} (IN USE)`;
             opt.style.color = '#dc3545'; // text-danger
