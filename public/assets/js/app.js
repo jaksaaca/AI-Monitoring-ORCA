@@ -189,11 +189,26 @@ async function initialize() {
                     populateStudios();
                 }
                 
-                // Also listen to studio statuses for anti-overlap
+                // Also listen to studio statuses for anti-overlap and forced take-overs
                 if (unsubscribeStudioStatus) unsubscribeStudioStatus();
                 unsubscribeStudioStatus = subscribeToStudioStatus(currentBranch, (statuses) => {
                     currentStudioStatuses = statuses;
                     updateStudioDropdown();
+                    
+                    // KICK OUT LOGIC: If someone else forces a Take Over on our active studio
+                    if (isSessionActive && currentSessionData) {
+                        const myStudio = currentSessionData.studio;
+                        const myName = sessionStorage.getItem('orca_user') || 'Unknown';
+                        const currentStatus = statuses[myStudio];
+                        
+                        // If the studio is active, but the operator registered in Firebase is NOT me...
+                        if (currentStatus && currentStatus.status === 'active' && currentStatus.operator && currentStatus.operator !== myName) {
+                            console.warn(`[KICK OUT] Studio diambil alih oleh ${currentStatus.operator}`);
+                            window._isAutoStop = true;
+                            window._kickOutMessage = `Sesi Anda dihentikan paksa karena Studio diambil alih oleh operator lain (${currentStatus.operator}).`;
+                            btnStop.click();
+                        }
+                    }
                 });
             }
         });
@@ -853,8 +868,9 @@ btnStop.addEventListener('click', async () => {
 
     let msg = 'Sesi ditutup secara manual oleh operator. Data telah aman disimpan ke Cloud.';
     if (window._isAutoStop) {
-        msg = 'Sesi ini dihentikan OTOMATIS karena jadwal program telah habis. Data telah diamankan.';
+        msg = window._kickOutMessage || 'Sesi ini dihentikan OTOMATIS karena jadwal program telah habis. Data telah diamankan.';
         window._isAutoStop = false; // reset
+        window._kickOutMessage = null; // reset
     }
     
     document.getElementById('endSessionMessage').textContent = msg;
