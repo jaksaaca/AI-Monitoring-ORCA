@@ -14,7 +14,7 @@ import * as VAD from './modules/vad.js';
 import * as Session from './modules/session.js';
 import { drawOverlay } from './modules/canvas-overlay.js';
 import { workerRequestAnimationFrame, workerCancelAnimationFrame, workerSetInterval, workerClearInterval } from './modules/worker-timer.js';
-import { getSchedule, saveSessionLog, subscribeToStudioStatus, setStudioStatus, listenToGlobalCommands } from './modules/firebase-db.js';
+import { getSchedule, getStudioStatuses, saveSessionLog, setStudioStatus, listenToGlobalCommands } from './modules/firebase-db.js';
 import { BRANCHES } from './modules/config.js';
 
 // ============================================
@@ -193,27 +193,9 @@ async function initialize() {
         };
         await refreshSchedule();
 
-        // Listen to studio statuses for anti-overlap and forced take-overs
+        // Poll studio statuses (every 30s via timer below — first fetch here)
         if (currentBranch) {
-            if (unsubscribeStudioStatus) unsubscribeStudioStatus();
-            unsubscribeStudioStatus = subscribeToStudioStatus(currentBranch, (statuses) => {
-                currentStudioStatuses = statuses;
-                updateStudioDropdown();
-                
-                // KICK OUT LOGIC: If someone else forces a Take Over on our active studio
-                if (isSessionActive && currentSessionData) {
-                    const myStudio = currentSessionData.studio;
-                    const myName = sessionStorage.getItem('orca_user') || 'Unknown';
-                    const currentStatus = statuses[myStudio];
-                    
-                    if (currentStatus && currentStatus.status === 'active' && currentStatus.operator && currentStatus.operator !== myName) {
-                        console.warn(`[KICK OUT] Studio diambil alih oleh ${currentStatus.operator}`);
-                        window._isAutoStop = true;
-                        window._kickOutMessage = `Sesi Anda dihentikan paksa karena Studio diambil alih oleh operator lain (${currentStatus.operator}).`;
-                        btnStop.click();
-                    }
-                }
-            });
+            await pollStudioStatuses();
         }
 
         // Wait a moment then show app
@@ -502,7 +484,7 @@ let activeSchedule = null;
 let scheduleDb = [];
 
 let currentStudioStatuses = {};
-let unsubscribeStudioStatus = null;
+let ghostCleanedStudios = new Set(); // Track studios already cleaned to prevent write loops
 
 const studioSelect = document.getElementById('studio');
 const infoHost = document.getElementById('info-host');
@@ -661,22 +643,58 @@ studioSelect.addEventListener('change', () => {
 // EVENT LISTENERS
 // ============================================
 
-// Heartbeat & Watchdog timers (keep standard setInterval since timing isn't critical, but let's use workerSetInterval to be safe)
+// Watchdog timer (runs every 30 seconds)
+let watchdogTickCount = 0;
 workerSetInterval(() => {
+    // Refresh active schedule display
     if (!isSessionActive && studioSelect.value) {
         studioSelect.dispatchEvent(new Event('change'));
     }
 
-    // Schedule refresh at minute 55 of every hour
-    const now = new Date();
-    if (now.getMinutes() === 55) {
-        getSchedule().then(data => {
-            scheduleDb = data;
-            if (!isSessionActive && currentBranch) populateStudios();
-            console.log("[Schedule] Auto-refreshed at 55 past the hour.");
-        }).catch(console.error);
+    // Poll studio statuses (replaces realtime listener, saves ~38k Read/day)
+    if (currentBranch) {
+        pollStudioStatuses();
     }
-}, 60000);
+
+    // Schedule refresh at minute 55 of every hour
+    watchdogTickCount++;
+    if (watchdogTickCount >= 2) { // Every 60 seconds check the clock
+        watchdogTickCount = 0;
+        const now = new Date();
+        if (now.getMinutes() === 55) {
+            getSchedule().then(data => {
+                scheduleDb = data;
+                if (!isSessionActive && currentBranch) populateStudios();
+                console.log("[Schedule] Auto-refreshed at 55 past the hour.");
+            }).catch(console.error);
+        }
+    }
+}, 30000);
+
+// Studio status polling function (replaces onSnapshot)
+async function pollStudioStatuses() {
+    try {
+        const statuses = await getStudioStatuses(currentBranch);
+        currentStudioStatuses = statuses;
+        updateStudioDropdown();
+
+        // KICK OUT LOGIC
+        if (isSessionActive && currentSessionData) {
+            const myStudio = currentSessionData.studio;
+            const myName = sessionStorage.getItem('orca_user') || 'Unknown';
+            const currentStatus = statuses[myStudio];
+
+            if (currentStatus && currentStatus.status === 'active' && currentStatus.operator && currentStatus.operator !== myName) {
+                console.warn(`[KICK OUT] Studio diambil alih oleh ${currentStatus.operator}`);
+                window._isAutoStop = true;
+                window._kickOutMessage = `Sesi Anda dihentikan paksa karena Studio diambil alih oleh operator lain (${currentStatus.operator}).`;
+                btnStop.click();
+            }
+        }
+    } catch (err) {
+        console.warn("[StudioStatus] Poll error:", err);
+    }
+}
 
 // Protect the active schedule by cloning it at the start of the session
 let currentSessionData = null;
@@ -989,10 +1007,16 @@ function updateStudioDropdown() {
             const now = new Date().getTime();
             if (now - statusData.updatedAt > 75000) {
                 isActive = false;
-                // Auto-cleanup ghost status in Firebase
-                setStudioStatus(currentBranch, opt.value, { status: 'idle', operator: '' }).catch(console.error);
-                console.log(`[Ghost Cleanup] Studio ${opt.value} auto-released (no heartbeat for >75s)`);
+                // Auto-cleanup ghost status in Firebase (only once per studio to prevent write loops)
+                if (!ghostCleanedStudios.has(opt.value)) {
+                    ghostCleanedStudios.add(opt.value);
+                    setStudioStatus(currentBranch, opt.value, { status: 'idle', operator: '' }).catch(console.error);
+                    console.log(`[Ghost Cleanup] Studio ${opt.value} auto-released (no heartbeat for >75s)`);
+                }
             }
+        } else if (!isActive) {
+            // Studio is confirmed idle, remove from ghost-cleaned tracking
+            ghostCleanedStudios.delete(opt.value);
         }
         
         if (isActive) {

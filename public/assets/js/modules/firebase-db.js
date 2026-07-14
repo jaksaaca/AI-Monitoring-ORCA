@@ -226,6 +226,20 @@ export function subscribeToStudioStatus(branch, callback) {
     });
 }
 
+// One-time fetch for polling (saves massive Read quota vs onSnapshot)
+export async function getStudioStatuses(branch) {
+    const q = query(
+        collection(db, "studio_status"),
+        where("branch", "==", branch)
+    );
+    const snapshot = await getDocs(q);
+    const statuses = {};
+    snapshot.forEach(d => {
+        statuses[d.data().studio] = d.data();
+    });
+    return statuses;
+}
+
 export async function setStudioStatus(branch, studio, statusData) {
     try {
         const docId = `${branch}_${studio}`.replace(/\s+/g, '_');

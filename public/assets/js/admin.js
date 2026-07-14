@@ -291,8 +291,8 @@ function initCommandCenter() {
     if (uptimeInterval) clearInterval(uptimeInterval);
     uptimeInterval = setInterval(updateUptimes, 1000);
     
-    // Force grid re-render every 5 seconds to catch timeouts
-    setInterval(renderGrid, 5000);
+    // Force grid re-render every 30 seconds to catch timeouts (uptime clocks still tick every 1s)
+    setInterval(renderGrid, 30000);
 }
 
 function listenToStatus() {
