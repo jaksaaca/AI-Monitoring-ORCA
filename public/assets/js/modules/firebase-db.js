@@ -20,6 +20,7 @@ import {
 const firebaseConfig = {
   apiKey: "AIzaSyChiTYLxjlWJ_fWn3JxYvggu-GZYiIBVgs",
   authDomain: "ai-monitoring-orca-8cfb3.firebaseapp.com",
+  databaseURL: "https://ai-monitoring-orca-8cfb3-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "ai-monitoring-orca-8cfb3",
   storageBucket: "ai-monitoring-orca-8cfb3.firebasestorage.app",
   messagingSenderId: "330499608796",
