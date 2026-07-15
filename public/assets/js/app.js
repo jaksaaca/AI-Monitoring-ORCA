@@ -518,7 +518,6 @@ let scheduleDb = [];
 
 let currentStudioStatuses = {};
 let unsubscribeStudioStatus = null;
-let ghostCleanedStudios = new Set(); // Track studios already cleaned to prevent write loops
 
 const studioSelect = document.getElementById('studio');
 const infoHost = document.getElementById('info-host');
@@ -678,7 +677,6 @@ studioSelect.addEventListener('change', () => {
 // ============================================
 
 // Watchdog timer (runs every 30 seconds)
-let watchdogTickCount = 0;
 workerSetInterval(() => {
     // Refresh active schedule display
     if (!isSessionActive && studioSelect.value) {

@@ -253,19 +253,7 @@ export function subscribeToStudioStatus(branch, callback) {
     return () => unsubscribe();
 }
 
-// One-time fetch for polling (kept for compatibility)
-export async function getStudioStatuses(branch) {
-    const branchRef = ref(rtdb, `studio_status/${branch}`);
-    const snapshot = await get(branchRef);
-    const statuses = {};
-    const data = snapshot.val();
-    if (data) {
-        Object.keys(data).forEach(key => {
-            statuses[data[key].studio] = data[key];
-        });
-    }
-    return statuses;
-}
+
 
 export async function setStudioStatus(branch, studio, statusData) {
     try {
