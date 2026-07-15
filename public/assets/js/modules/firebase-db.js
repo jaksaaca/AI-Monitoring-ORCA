@@ -10,6 +10,9 @@ import {
     getFirestore, collection, doc, setDoc, getDocs, 
     addDoc, deleteDoc, query, where, orderBy, onSnapshot, limit
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { 
+    getDatabase, ref, update, onValue, get 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 // ==========================================
 // ⚠️ FIREBASE CONFIGURATION (USER MUST FILL)
@@ -31,6 +34,7 @@ if (!firebaseConfig.apiKey) {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const rtdb = getDatabase(app);
 
 // ==========================================
 // 1. CUSTOM AUTHENTICATION & USERS
@@ -212,44 +216,46 @@ export async function getAllSessionLogs(startDate = null, endDate = null) {
 // ==========================================
 
 export function subscribeToStudioStatus(branch, callback) {
-    const q = query(
-        collection(db, "studio_status"), 
-        where("branch", "==", branch)
-    );
+    const branchRef = ref(rtdb, `studio_status/${branch}`);
     
-    return onSnapshot(q, (snapshot) => {
+    const unsubscribe = onValue(branchRef, (snapshot) => {
         const statuses = {};
-        snapshot.forEach(doc => {
-            statuses[doc.data().studio] = doc.data();
-        });
+        const data = snapshot.val();
+        if (data) {
+            Object.keys(data).forEach(key => {
+                statuses[data[key].studio] = data[key];
+            });
+        }
         callback(statuses);
     });
+    
+    return () => unsubscribe();
 }
 
-// One-time fetch for polling (saves massive Read quota vs onSnapshot)
+// One-time fetch for polling (kept for compatibility)
 export async function getStudioStatuses(branch) {
-    const q = query(
-        collection(db, "studio_status"),
-        where("branch", "==", branch)
-    );
-    const snapshot = await getDocs(q);
+    const branchRef = ref(rtdb, `studio_status/${branch}`);
+    const snapshot = await get(branchRef);
     const statuses = {};
-    snapshot.forEach(d => {
-        statuses[d.data().studio] = d.data();
-    });
+    const data = snapshot.val();
+    if (data) {
+        Object.keys(data).forEach(key => {
+            statuses[data[key].studio] = data[key];
+        });
+    }
     return statuses;
 }
 
 export async function setStudioStatus(branch, studio, statusData) {
     try {
-        const docId = `${branch}_${studio}`.replace(/\s+/g, '_');
-        const docRef = doc(db, "studio_status", docId);
-        await setDoc(docRef, {
+        const safeStudio = studio.replace(/[\.\#\$\[\]]/g, '_'); // RTDB keys cannot contain ., #, $, [, or ]
+        const studioRef = ref(rtdb, `studio_status/${branch}/${safeStudio}`);
+        await update(studioRef, {
             branch,
             studio,
             ...statusData,
             updatedAt: new Date().getTime()
-        }, { merge: true });
+        });
     } catch (e) {
         console.error("Error setting studio status: ", e);
         throw e;

@@ -14,7 +14,7 @@ import * as VAD from './modules/vad.js';
 import * as Session from './modules/session.js';
 import { drawOverlay } from './modules/canvas-overlay.js';
 import { workerRequestAnimationFrame, workerCancelAnimationFrame, workerSetInterval, workerClearInterval } from './modules/worker-timer.js';
-import { getSchedule, getStudioStatuses, saveSessionLog, setStudioStatus, listenToGlobalCommands } from './modules/firebase-db.js';
+import { getSchedule, subscribeToStudioStatus, saveSessionLog, setStudioStatus, listenToGlobalCommands } from './modules/firebase-db.js';
 import { BRANCHES } from './modules/config.js';
 
 // ============================================
@@ -193,9 +193,27 @@ async function initialize() {
         };
         await refreshSchedule();
 
-        // Poll studio statuses (every 30s via timer below — first fetch here)
+        // Listen to studio statuses for anti-overlap and forced take-overs (Realtime via RTDB)
         if (currentBranch) {
-            await pollStudioStatuses();
+            if (unsubscribeStudioStatus) unsubscribeStudioStatus();
+            unsubscribeStudioStatus = subscribeToStudioStatus(currentBranch, (statuses) => {
+                currentStudioStatuses = statuses;
+                updateStudioDropdown();
+                
+                // KICK OUT LOGIC: If someone else forces a Take Over on our active studio
+                if (isSessionActive && currentSessionData) {
+                    const myStudio = currentSessionData.studio;
+                    const myName = sessionStorage.getItem('orca_user') || 'Unknown';
+                    const currentStatus = statuses[myStudio];
+                    
+                    if (currentStatus && currentStatus.status === 'active' && currentStatus.operator && currentStatus.operator !== myName) {
+                        console.warn(`[KICK OUT] Studio diambil alih oleh ${currentStatus.operator}`);
+                        window._isAutoStop = true;
+                        window._kickOutMessage = `Sesi Anda dihentikan paksa karena Studio diambil alih oleh operator lain (${currentStatus.operator}).`;
+                        btnStop.click();
+                    }
+                }
+            });
         }
 
         // Wait a moment then show app
@@ -484,6 +502,7 @@ let activeSchedule = null;
 let scheduleDb = [];
 
 let currentStudioStatuses = {};
+let unsubscribeStudioStatus = null;
 let ghostCleanedStudios = new Set(); // Track studios already cleaned to prevent write loops
 
 const studioSelect = document.getElementById('studio');
@@ -651,11 +670,6 @@ workerSetInterval(() => {
         studioSelect.dispatchEvent(new Event('change'));
     }
 
-    // Poll studio statuses (replaces realtime listener, saves ~38k Read/day)
-    if (currentBranch) {
-        pollStudioStatuses();
-    }
-
     // Schedule refresh at minute 55 of every hour
     watchdogTickCount++;
     if (watchdogTickCount >= 2) { // Every 60 seconds check the clock
@@ -670,31 +684,6 @@ workerSetInterval(() => {
         }
     }
 }, 30000);
-
-// Studio status polling function (replaces onSnapshot)
-async function pollStudioStatuses() {
-    try {
-        const statuses = await getStudioStatuses(currentBranch);
-        currentStudioStatuses = statuses;
-        updateStudioDropdown();
-
-        // KICK OUT LOGIC
-        if (isSessionActive && currentSessionData) {
-            const myStudio = currentSessionData.studio;
-            const myName = sessionStorage.getItem('orca_user') || 'Unknown';
-            const currentStatus = statuses[myStudio];
-
-            if (currentStatus && currentStatus.status === 'active' && currentStatus.operator && currentStatus.operator !== myName) {
-                console.warn(`[KICK OUT] Studio diambil alih oleh ${currentStatus.operator}`);
-                window._isAutoStop = true;
-                window._kickOutMessage = `Sesi Anda dihentikan paksa karena Studio diambil alih oleh operator lain (${currentStatus.operator}).`;
-                btnStop.click();
-            }
-        }
-    } catch (err) {
-        console.warn("[StudioStatus] Poll error:", err);
-    }
-}
 
 // Protect the active schedule by cloning it at the start of the session
 let currentSessionData = null;
@@ -811,9 +800,9 @@ btnStart.addEventListener('click', async () => {
         };
         localStorage.setItem('orca_backup_session', JSON.stringify(logData));
         
-        // HEARTBEAT PING: Send active status to Firebase every 60 seconds (12 ticks of 5s)
+        // HEARTBEAT PING: Send active status to Firebase every 15 seconds (3 ticks of 5s)
         tickCount++;
-        if (tickCount >= 12) {
+        if (tickCount >= 3) {
             tickCount = 0;
             setStudioStatus(currentBranch, currentSessionData.studio, {
                 status: 'active',
@@ -1002,16 +991,16 @@ function updateStudioDropdown() {
         const statusData = currentStudioStatuses[opt.value];
         let isActive = statusData && statusData.status === 'active';
         
-        // Heartbeat timeout: if no heartbeat in the last 75 seconds, treat as idle (ghost session)
+        // Heartbeat timeout: if no heartbeat in the last 30 seconds, treat as idle (ghost session)
         if (isActive && statusData.updatedAt) {
             const now = new Date().getTime();
-            if (now - statusData.updatedAt > 75000) {
+            if (now - statusData.updatedAt > 30000) {
                 isActive = false;
                 // Auto-cleanup ghost status in Firebase (only once per studio to prevent write loops)
                 if (!ghostCleanedStudios.has(opt.value)) {
                     ghostCleanedStudios.add(opt.value);
                     setStudioStatus(currentBranch, opt.value, { status: 'idle', operator: '' }).catch(console.error);
-                    console.log(`[Ghost Cleanup] Studio ${opt.value} auto-released (no heartbeat for >75s)`);
+                    console.log(`[Ghost Cleanup] Studio ${opt.value} auto-released (no heartbeat for >30s)`);
                 }
             }
         } else if (!isActive) {

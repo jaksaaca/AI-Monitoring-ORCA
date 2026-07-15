@@ -291,8 +291,8 @@ function initCommandCenter() {
     if (uptimeInterval) clearInterval(uptimeInterval);
     uptimeInterval = setInterval(updateUptimes, 1000);
     
-    // Force grid re-render every 30 seconds to catch timeouts (uptime clocks still tick every 1s)
-    setInterval(renderGrid, 30000);
+    // Force grid re-render every 5 seconds to catch timeouts (uptime clocks still tick every 1s)
+    setInterval(renderGrid, 5000);
 }
 
 function listenToStatus() {
@@ -317,10 +317,10 @@ function renderGrid() {
         const statusData = currentStatuses[studioName] || { status: 'idle' };
         let isActive = statusData.status === 'active';
         
-        // Timeout check: if no heartbeat in the last 75 seconds, mark as idle
+        // Timeout check: if no heartbeat in the last 30 seconds, mark as idle
         if (isActive && statusData.updatedAt) {
             const now = new Date().getTime();
-            if (now - statusData.updatedAt > 75000) {
+            if (now - statusData.updatedAt > 30000) {
                 isActive = false;
             }
         }
