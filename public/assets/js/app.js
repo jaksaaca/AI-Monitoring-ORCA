@@ -14,7 +14,7 @@ import * as VAD from './modules/vad.js';
 import * as Session from './modules/session.js';
 import { drawOverlay } from './modules/canvas-overlay.js';
 import { workerRequestAnimationFrame, workerCancelAnimationFrame, workerSetInterval, workerClearInterval } from './modules/worker-timer.js';
-import { getSchedule, subscribeToStudioStatus, saveSessionLog, setStudioStatus, listenToGlobalCommands } from './modules/firebase-db.js';
+import { getSchedule, subscribeToStudioStatus, saveSessionLog, setStudioStatus, listenToGlobalCommands, listenToScheduleSignal } from './modules/firebase-db.js';
 import { BRANCHES } from './modules/config.js';
 
 // ============================================
@@ -192,6 +192,21 @@ async function initialize() {
             }
         };
         await refreshSchedule();
+
+        // Listen to schedule signals (Real-time sync triggered by Admin)
+        let initialSignalFired = false;
+        if (currentBranch) {
+            listenToScheduleSignal(currentBranch, (timestamp) => {
+                if (!initialSignalFired) {
+                    initialSignalFired = true;
+                    return; // Skip first trigger on boot
+                }
+                if (timestamp) {
+                    console.log(`[Schedule] Signal received! Fetching new schedule...`);
+                    refreshSchedule();
+                }
+            });
+        }
 
         // Listen to studio statuses for anti-overlap and forced take-overs (Realtime via RTDB)
         if (currentBranch) {
@@ -670,19 +685,7 @@ workerSetInterval(() => {
         studioSelect.dispatchEvent(new Event('change'));
     }
 
-    // Schedule refresh at minute 55 of every hour
-    watchdogTickCount++;
-    if (watchdogTickCount >= 2) { // Every 60 seconds check the clock
-        watchdogTickCount = 0;
-        const now = new Date();
-        if (now.getMinutes() === 55) {
-            getSchedule().then(data => {
-                scheduleDb = data;
-                if (!isSessionActive && currentBranch) populateStudios();
-                console.log("[Schedule] Auto-refreshed at 55 past the hour.");
-            }).catch(console.error);
-        }
-    }
+    // Watchdog now only handles UI refresh (Server handles ghost timeouts & Schedule is real-time via Signal)
 }, 30000);
 
 // Protect the active schedule by cloning it at the start of the session
@@ -991,22 +994,8 @@ function updateStudioDropdown() {
         const statusData = currentStudioStatuses[opt.value];
         let isActive = statusData && statusData.status === 'active';
         
-        // Heartbeat timeout: if no heartbeat in the last 30 seconds, treat as idle (ghost session)
-        if (isActive && statusData.updatedAt) {
-            const now = new Date().getTime();
-            if (now - statusData.updatedAt > 30000) {
-                isActive = false;
-                // Auto-cleanup ghost status in Firebase (only once per studio to prevent write loops)
-                if (!ghostCleanedStudios.has(opt.value)) {
-                    ghostCleanedStudios.add(opt.value);
-                    setStudioStatus(currentBranch, opt.value, { status: 'idle', operator: '' }).catch(console.error);
-                    console.log(`[Ghost Cleanup] Studio ${opt.value} auto-released (no heartbeat for >30s)`);
-                }
-            }
-        } else if (!isActive) {
-            // Studio is confirmed idle, remove from ghost-cleaned tracking
-            ghostCleanedStudios.delete(opt.value);
-        }
+        // Native onDisconnect in Firebase DB now automatically cleans up ghost sessions instantly on the server side.
+        // No need for local 30s timeout checks anymore!
         
         if (isActive) {
             opt.disabled = false; // Allow selection for force takeover

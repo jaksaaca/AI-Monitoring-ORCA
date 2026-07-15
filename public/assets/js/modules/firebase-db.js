@@ -11,7 +11,7 @@ import {
     addDoc, deleteDoc, query, where, orderBy, onSnapshot, limit
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { 
-    getDatabase, ref, update, onValue, get 
+    getDatabase, ref, update, onValue, get, onDisconnect 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 // ==========================================
@@ -160,6 +160,9 @@ export async function uploadSchedule(scheduleArray, branch, organization) {
         }
         
         console.log(`[Upload] Complete!`);
+        
+        // Trigger real-time signal to all Hosts to fetch the new schedule
+        await triggerScheduleSignal(branch);
     };
 
     await Promise.race([
@@ -213,6 +216,23 @@ export async function getAllSessionLogs(startDate = null, endDate = null) {
 }
 
 // ==========================================
+// 3. SCHEDULE SYNC SIGNAL (RTDB)
+// ==========================================
+
+export async function triggerScheduleSignal(branch) {
+    const signalRef = ref(rtdb, `schedule_signal/${branch}`);
+    await update(ref(rtdb), { [`schedule_signal/${branch}`]: new Date().getTime() });
+}
+
+export function listenToScheduleSignal(branch, callback) {
+    const signalRef = ref(rtdb, `schedule_signal/${branch}`);
+    const unsubscribe = onValue(signalRef, (snapshot) => {
+        callback(snapshot.val());
+    });
+    return () => unsubscribe();
+}
+
+// ==========================================
 // 4. COMMAND CENTER (STUDIO STATUS)
 // ==========================================
 
@@ -257,6 +277,14 @@ export async function setStudioStatus(branch, studio, statusData) {
             ...statusData,
             updatedAt: new Date().getTime()
         });
+        
+        // NATIVE SERVER-SIDE GHOST CLEANUP
+        // Tell Firebase server to automatically set this studio to idle if the user's internet disconnects
+        if (statusData.status === 'active') {
+            onDisconnect(studioRef).update({ status: 'idle', operator: '', host: '' });
+        } else {
+            onDisconnect(studioRef).cancel(); // Cancel the trigger if we manually set to idle (End Session)
+        }
     } catch (e) {
         console.error("Error setting studio status: ", e);
         throw e;

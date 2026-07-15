@@ -317,13 +317,8 @@ function renderGrid() {
         const statusData = currentStatuses[studioName] || { status: 'idle' };
         let isActive = statusData.status === 'active';
         
-        // Timeout check: if no heartbeat in the last 30 seconds, mark as idle
-        if (isActive && statusData.updatedAt) {
-            const now = new Date().getTime();
-            if (now - statusData.updatedAt > 30000) {
-                isActive = false;
-            }
-        }
+        // Native onDisconnect handles ghost timeouts instantly on the server.
+        // No local timeout checking needed here anymore!
 
 
         
