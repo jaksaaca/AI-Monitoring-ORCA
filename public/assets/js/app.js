@@ -14,7 +14,7 @@ import * as VAD from './modules/vad.js';
 import * as Session from './modules/session.js';
 import { drawOverlay } from './modules/canvas-overlay.js?v=2';
 import { workerRequestAnimationFrame, workerCancelAnimationFrame, workerSetInterval, workerClearInterval } from './modules/worker-timer.js';
-import { getSchedule, subscribeToStudioStatus, saveSessionLog, setStudioStatus, listenToGlobalCommands, listenToScheduleSignal } from './modules/firebase-db.js';
+import { getSchedule, getStudioStatuses, subscribeToOwnStudioStatus, saveSessionLog, setStudioStatus, listenToGlobalCommands, listenToScheduleSignal } from './modules/firebase-db.js';
 import { BRANCHES } from './modules/config.js';
 
 // ============================================
@@ -39,10 +39,14 @@ window.selectBranch = function(branch) {
     // Update label on UI
     document.getElementById('system-status-text').textContent = `System Ready (${branch})`;
     
-    // Trigger reload of schedule if it was already fetched
-    if (scheduleDb.length > 0) {
+    // Fetch this branch's schedule if we don't have it yet (scheduleDb is
+    // now branch-scoped to cut Firestore reads)
+    if (scheduleDb.some(s => s.branch && s.branch.toLowerCase() === branch.toLowerCase())) {
         populateStudios();
+    } else if (refreshSchedule) {
+        refreshSchedule();
     }
+    refreshStudioStatuses();
 };
 
 // ============================================
@@ -189,9 +193,11 @@ async function initialize() {
         setLoadingProgress(100, 'System ready!');
         
         // Load schedule once at startup (Saves thousands of reads compared to realtime)
-        const refreshSchedule = async () => {
+        // Branch-scoped when a branch is known — avoids reading the other
+        // branch's rows on every boot/signal (Firestore read quota).
+        refreshSchedule = async () => {
             try {
-                scheduleDb = await getSchedule();
+                scheduleDb = await getSchedule(currentBranch || null);
                 if (currentBranch && !isSessionActive) {
                     populateStudios();
                 }
@@ -200,6 +206,12 @@ async function initialize() {
             }
         };
         await refreshSchedule();
+
+        // Studio statuses for the dropdown are fetched ONE-SHOT (no open
+        // listener) — a branch-wide subscription made every open tab receive
+        // every heartbeat, which was the biggest RTDB bandwidth consumer.
+        // Kick-out detection uses a single-studio subscription during sessions.
+        await refreshStudioStatuses();
 
         // Listen to schedule signals (Real-time sync triggered by Admin)
         let initialSignalFired = false;
@@ -212,29 +224,7 @@ async function initialize() {
                 if (timestamp) {
                     console.log(`[Schedule] Signal received! Fetching new schedule...`);
                     refreshSchedule();
-                }
-            });
-        }
-
-        // Listen to studio statuses for anti-overlap and forced take-overs (Realtime via RTDB)
-        if (currentBranch) {
-            if (unsubscribeStudioStatus) unsubscribeStudioStatus();
-            unsubscribeStudioStatus = subscribeToStudioStatus(currentBranch, (statuses) => {
-                currentStudioStatuses = statuses;
-                updateStudioDropdown();
-                
-                // KICK OUT LOGIC: If someone else forces a Take Over on our active studio
-                if (isSessionActive && currentSessionData) {
-                    const myStudio = currentSessionData.studio;
-                    const myName = sessionStorage.getItem('orca_user') || 'Unknown';
-                    const currentStatus = statuses[myStudio];
-                    
-                    if (currentStatus && currentStatus.status === 'active' && currentStatus.operator && currentStatus.operator !== myName) {
-                        console.warn(`[KICK OUT] Studio diambil alih oleh ${currentStatus.operator}`);
-                        window._isAutoStop = true;
-                        window._kickOutMessage = `Sesi Anda dihentikan paksa karena Studio diambil alih oleh operator lain (${currentStatus.operator}).`;
-                        btnStop.click();
-                    }
+                    refreshStudioStatuses();
                 }
             });
         }
@@ -600,9 +590,23 @@ function formatDuration(totalSeconds) {
 // ============================================
 let activeSchedule = null;
 let scheduleDb = [];
+let refreshSchedule = null; // assigned inside initialize(), used by selectBranch
 
 let currentStudioStatuses = {};
-let unsubscribeStudioStatus = null;
+let unsubscribeOwnStudio = null;
+
+// One-shot branch status fetch for the dropdown (anti-overlap labels).
+// No listener held open — refreshed at boot, on branch change, on schedule
+// signal, when the dropdown gets focus, and right before Start.
+async function refreshStudioStatuses() {
+    if (!currentBranch) return;
+    try {
+        currentStudioStatuses = await getStudioStatuses(currentBranch);
+        updateStudioDropdown();
+    } catch (e) {
+        console.warn("[Status] Fetch failed:", e);
+    }
+}
 
 const studioSelect = document.getElementById('studio');
 const infoHost = document.getElementById('info-host');
@@ -653,6 +657,9 @@ function populateStudios() {
         studioSelect.dispatchEvent(new Event('change'));
     }
 }
+
+// Refresh status labels when user opens the dropdown (fresh without a listener)
+studioSelect.addEventListener('mousedown', refreshStudioStatuses);
 
 // Update UI when Studio changes
 studioSelect.addEventListener('change', () => {
@@ -786,6 +793,8 @@ btnStart.addEventListener('click', async () => {
     }
 
     const studioName = activeSchedule.studio;
+    // Fresh check right before start (dropdown data may be minutes old)
+    await refreshStudioStatuses();
     const statusData = currentStudioStatuses[studioName];
     if (statusData && statusData.status === 'active') {
         const force = window.confirm(`WARNING: Studio [${studioName}] is currently IN USE by another operator!\n\nDo you want to FORCE TAKE OVER this studio? (Hanya gunakan jika studio tersangkut / error)`);
@@ -820,6 +829,20 @@ btnStart.addEventListener('click', async () => {
         showUIError("Failed to start session: " + e.message);
         return;
     }
+
+    // Kick-out detection: listen to ONLY our studio node while session runs
+    // (replaces the old branch-wide listener that streamed every heartbeat)
+    if (unsubscribeOwnStudio) unsubscribeOwnStudio();
+    unsubscribeOwnStudio = subscribeToOwnStudioStatus(currentBranch, studioName, (status) => {
+        if (!isSessionActive || !currentSessionData) return;
+        const myName = sessionStorage.getItem('orca_user') || 'Unknown';
+        if (status && status.status === 'active' && status.operator && status.operator !== myName) {
+            console.warn(`[KICK OUT] Studio diambil alih oleh ${status.operator}`);
+            window._isAutoStop = true;
+            window._kickOutMessage = `Sesi Anda dihentikan paksa karena Studio diambil alih oleh operator lain (${status.operator}).`;
+            btnStop.click();
+        }
+    });
 
     // Determine if Auto-Stop should be active for this session
     let autoStopEnabled = true;
@@ -886,9 +909,10 @@ btnStart.addEventListener('click', async () => {
         };
         localStorage.setItem('orca_backup_session', JSON.stringify(logData));
         
-        // HEARTBEAT PING: Send active status to Firebase every 15 seconds (3 ticks of 5s)
+        // HEARTBEAT PING: every 60 seconds (12 ticks of 5s) — quota-friendly.
+        // Ghost cleanup doesn't depend on this (onDisconnect is server-side).
         tickCount++;
-        if (tickCount >= 3) {
+        if (tickCount >= 12) {
             tickCount = 0;
             setStudioStatus(currentBranch, currentSessionData.studio, {
                 status: 'active',
@@ -956,6 +980,7 @@ btnStop.addEventListener('click', async () => {
     
     // Always stop the interval and clear active studio state so UI can reset
     if (backupInterval) workerClearInterval(backupInterval);
+    if (unsubscribeOwnStudio) { unsubscribeOwnStudio(); unsubscribeOwnStudio = null; }
     sessionStorage.removeItem('orca_active_studio');
 
     try {

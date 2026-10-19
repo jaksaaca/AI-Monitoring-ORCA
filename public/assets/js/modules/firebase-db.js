@@ -253,6 +253,29 @@ export function subscribeToStudioStatus(branch, callback) {
     return () => unsubscribe();
 }
 
+// One-shot fetch of all studio statuses for a branch (no listener held open).
+// Operators use this instead of subscribeToStudioStatus so idle tabs stop
+// receiving every heartbeat broadcast (biggest RTDB bandwidth saver).
+export async function getStudioStatuses(branch) {
+    const snapshot = await get(ref(rtdb, `studio_status/${branch}`));
+    const data = snapshot.val() || {};
+    const statuses = {};
+    Object.keys(data).forEach(key => {
+        if (data[key] && data[key].studio) statuses[data[key].studio] = data[key];
+    });
+    return statuses;
+}
+
+// Subscribe to a single studio node — used for kick-out detection while a
+// session is active. Receives only that studio's updates, not the whole branch.
+export function subscribeToOwnStudioStatus(branch, studio, callback) {
+    const safeStudio = studio.replace(/[\.\#\$\[\]]/g, '_');
+    const unsubscribe = onValue(ref(rtdb, `studio_status/${branch}/${safeStudio}`), (snapshot) => {
+        callback(snapshot.val());
+    });
+    return () => unsubscribe();
+}
+
 
 
 export async function setStudioStatus(branch, studio, statusData) {
