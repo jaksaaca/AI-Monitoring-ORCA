@@ -1,5 +1,5 @@
-import { getAllSessionLogs, getAllUsers, createUser, deleteUser, deleteSessionLog } from "./modules/firebase-db.js";
-import { populateBranchSelect, populateOrgSelect } from "./modules/config.js";
+import { getAllSessionLogs, getAllUsers, createUser, deleteUser, deleteSessionLog, subscribeToBranchConfig, saveStudioCount } from "./modules/firebase-db.js";
+import { populateBranchSelect, populateOrgSelect, BRANCHES, getBranch, applyBranchCounts } from "./modules/config.js";
 
 // Check Auth
 const authData = JSON.parse(sessionStorage.getItem('orca_auth'));
@@ -454,6 +454,67 @@ window.deleteAccount = async (id, username) => {
         }
     }
 };
+
+// ==========================================
+// BRANCH STUDIO SETTINGS
+// ==========================================
+const branchConfigInputs = document.getElementById('branch-config-inputs');
+const formBranchConfig = document.getElementById('form-branch-config');
+
+function renderBranchConfigInputs() {
+    if (!branchConfigInputs) return;
+    if (branchConfigInputs.children.length === 0) {
+        branchConfigInputs.innerHTML = BRANCHES.map(b => `
+            <div>
+                <label class="form-label small text-secondary mb-1">${b.name} (${b.suffix})</label>
+                <input type="number" min="1" max="99" class="form-control form-control-sm" data-branch="${b.name}" style="width: 120px;">
+            </div>
+        `).join('');
+    }
+    branchConfigInputs.querySelectorAll('input[data-branch]').forEach(inp => {
+        if (document.activeElement === inp) return; // don't clobber while typing
+        const b = getBranch(inp.dataset.branch);
+        if (b) inp.value = b.studioCount;
+    });
+}
+
+if (branchConfigInputs) {
+    subscribeToBranchConfig((cfg) => {
+        applyBranchCounts(cfg);
+        renderBranchConfigInputs();
+    });
+    renderBranchConfigInputs();
+}
+
+if (formBranchConfig) {
+    formBranchConfig.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const inputs = Array.from(branchConfigInputs.querySelectorAll('input[data-branch]'));
+        const changes = inputs
+            .map(inp => ({ branch: inp.dataset.branch, count: parseInt(inp.value, 10) }))
+            .filter(c => Number.isInteger(c.count) && c.count > 0 && c.count !== (getBranch(c.branch) || {}).studioCount);
+
+        if (changes.length === 0) return;
+
+        const btn = document.getElementById('btn-save-branch-config');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+        try {
+            for (const c of changes) {
+                await saveStudioCount(c.branch, c.count);
+                applyBranchCounts({ [c.branch]: { studioCount: c.count } });
+            }
+            renderBranchConfigInputs();
+            btn.textContent = 'Saved';
+        } catch (err) {
+            alert('Error saving studio counts: ' + err.message);
+            btn.textContent = 'Save Studio Counts';
+        } finally {
+            btn.disabled = false;
+            setTimeout(() => { btn.textContent = 'Save Studio Counts'; }, 1500);
+        }
+    });
+}
 
 // Init
 loadAnalytics();

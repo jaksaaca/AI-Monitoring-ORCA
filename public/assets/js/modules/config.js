@@ -25,6 +25,19 @@ export function getBranch(name) {
 }
 
 /**
+ * Apply studio counts from RTDB branch_config onto BRANCHES (in-place),
+ * so every consumer (grid, selects) sees the cloud value without a deploy.
+ * Falls back to the hardcoded default when a branch is missing from cfg.
+ * @param {object} cfg — e.g. { Jakarta: { studioCount: 12 }, Bandung: {...} }
+ */
+export function applyBranchCounts(cfg) {
+    BRANCHES.forEach(b => {
+        const cloud = cfg && cfg[b.name] && cfg[b.name].studioCount;
+        b.studioCount = Number.isInteger(cloud) && cloud > 0 ? cloud : b.studioCount;
+    });
+}
+
+/**
  * Populate a <select> element with branch options.
  * @param {HTMLSelectElement} selectEl
  * @param {object} opts — { includeAll: boolean, selectedValue: string }

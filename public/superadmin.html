@@ -253,6 +253,26 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Branch Studio Counts -->
+                <div class="row g-4 mt-1">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header py-3">
+                                <h6 class="mb-0 fw-semibold d-flex align-items-center gap-2">
+                                    <i data-lucide="settings" class="text-secondary" style="width: 18px;"></i> Branch Studio Settings
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <form id="form-branch-config" class="d-flex flex-wrap align-items-end gap-3">
+                                    <div id="branch-config-inputs" class="d-flex flex-wrap gap-3"></div>
+                                    <button type="submit" id="btn-save-branch-config" class="btn btn-primary btn-sm">Save Studio Counts</button>
+                                </form>
+                                <p class="text-secondary small mt-2 mb-0">Studio count applies to the admin Command Center grid. Active studios stay visible until session ends even if the count is lowered.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
         </div>
@@ -267,6 +287,6 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
     <script>try { lucide.createIcons(); } catch(e) { console.warn(e); }</script>
-    <script type="module" src="assets/js/superadmin.js?v=5"></script>
+    <script type="module" src="assets/js/superadmin.js?v=6"></script>
 </body>
 </html>

@@ -301,3 +301,19 @@ export function listenToGlobalCommands(callback) {
         }
     });
 }
+
+// ==========================================
+// 6. BRANCH CONFIG (studio counts)
+// ==========================================
+
+export function subscribeToBranchConfig(callback) {
+    const configRef = ref(rtdb, 'branch_config');
+    const unsubscribe = onValue(configRef, (snapshot) => {
+        callback(snapshot.val() || {});
+    });
+    return () => unsubscribe();
+}
+
+export async function saveStudioCount(branch, count) {
+    await update(ref(rtdb), { [`branch_config/${branch}/studioCount`]: count });
+}

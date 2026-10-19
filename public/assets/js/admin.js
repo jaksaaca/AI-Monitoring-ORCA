@@ -6,8 +6,8 @@
  * ================================================
  */
 
-import { uploadSchedule, getSchedule, subscribeToStudioStatus } from "./modules/firebase-db.js";
-import { BRANCHES, getBranch, populateBranchSelect, populateOrgSelect } from "./modules/config.js";
+import { uploadSchedule, getSchedule, subscribeToStudioStatus, subscribeToBranchConfig } from "./modules/firebase-db.js";
+import { BRANCHES, getBranch, populateBranchSelect, populateOrgSelect, applyBranchCounts } from "./modules/config.js";
 
 // Check Auth
 const authData = JSON.parse(sessionStorage.getItem('orca_auth'));
@@ -269,8 +269,22 @@ const ccBranch = document.getElementById('cc-branch');
 const ccGrid = document.getElementById('command-center-grid');
 
 let unsubscribeStatus = null;
+let unsubscribeBranchConfig = null;
 let currentStatuses = {};
 let uptimeInterval = null;
+
+// Grid size = configured count, but never below an ACTIVE studio
+// (count drop mid-session keeps running studios visible until they idle)
+function effectiveStudioCount(branch) {
+    const branchConfig = getBranch(branch);
+    let count = branchConfig ? branchConfig.studioCount : 10;
+    for (const key of Object.keys(currentStatuses)) {
+        if (currentStatuses[key].status !== 'active') continue;
+        const m = key.match(/^Studio (\d+)/);
+        if (m) count = Math.max(count, parseInt(m[1], 10));
+    }
+    return count;
+}
 
 function initCommandCenter() {
     if (!ccBranch || !ccGrid) return;
@@ -287,6 +301,13 @@ function initCommandCenter() {
         listenToStatus();
     });
     listenToStatus();
+
+    // Cloud studio counts (superadmin) → apply + re-render (signature change rebuilds)
+    if (unsubscribeBranchConfig) unsubscribeBranchConfig();
+    unsubscribeBranchConfig = subscribeToBranchConfig((cfg) => {
+        applyBranchCounts(cfg);
+        renderGrid();
+    });
     
     // Start uptime ticking
     if (uptimeInterval) clearInterval(uptimeInterval);
@@ -315,7 +336,7 @@ let gridCards = []; // [{ studio, card, badge, status, brand, host, sched, clock
 function buildGrid() {
     const branch = ccBranch.value;
     const branchConfig = getBranch(branch);
-    const numStudios = branchConfig ? branchConfig.studioCount : 10;
+    const numStudios = effectiveStudioCount(branch);
     const suffix = branchConfig ? branchConfig.suffix : '';
 
     ccGrid.innerHTML = '';
@@ -366,8 +387,7 @@ function buildGrid() {
 
 function renderGrid() {
     const branch = ccBranch.value;
-    const branchConfig = getBranch(branch);
-    const numStudios = branchConfig ? branchConfig.studioCount : 10;
+    const numStudios = effectiveStudioCount(branch);
 
     // Rebuild only when branch or studio count changes
     const signature = `${branch}|${numStudios}`;
