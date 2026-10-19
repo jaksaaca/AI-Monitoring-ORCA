@@ -36,15 +36,16 @@ export function drawOverlay(ctx, opts) {
 
         // ---- Bounding Box ----
         const boxColor = isSpeaking ? '#10b981' : '#6366f1';
-        ctx.strokeStyle = boxColor;
-        ctx.lineWidth = 2.5;
-        ctx.shadowColor = boxColor;
-        ctx.shadowBlur = 8;
-
-        // Draw rounded rect
+        // Double-stroke (dark halo + color) instead of ctx.shadowBlur —
+        // canvas shadow is a slow GPU path and was the biggest per-frame cost.
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.lineWidth = 5;
         drawRoundedRect(ctx, fx, fy, fw, fh, 6);
         ctx.stroke();
-        ctx.shadowBlur = 0;
+        ctx.strokeStyle = boxColor;
+        ctx.lineWidth = 2.5;
+        drawRoundedRect(ctx, fx, fy, fw, fh, 6);
+        ctx.stroke();
 
         // ---- Corner Accents ----
         const cornerLen = Math.min(fw, fh) * 0.15;
@@ -91,13 +92,13 @@ export function drawOverlay(ctx, opts) {
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
         ctx.font = '700 18px Inter, sans-serif';
-        ctx.fillStyle = '#ef4444';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.shadowColor = 'rgba(239, 68, 68, 0.4)';
-        ctx.shadowBlur = 12;
+        // Halo via double-draw instead of shadowBlur (slow GPU path)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillText('NO FACE DETECTED', canvasWidth / 2 + 1, canvasHeight / 2 + 1);
+        ctx.fillStyle = '#ef4444';
         ctx.fillText('NO FACE DETECTED', canvasWidth / 2, canvasHeight / 2);
-        ctx.shadowBlur = 0;
         ctx.textAlign = 'start';
     }
 }

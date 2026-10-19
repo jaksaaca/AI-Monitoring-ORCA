@@ -283,6 +283,7 @@ function initCommandCenter() {
     
     ccBranch.addEventListener('change', () => {
         localStorage.setItem('orca_admin_branch', ccBranch.value);
+        builtGridSignature = null; // branch changed → rebuild cards from scratch
         listenToStatus();
     });
     listenToStatus();
@@ -291,8 +292,8 @@ function initCommandCenter() {
     if (uptimeInterval) clearInterval(uptimeInterval);
     uptimeInterval = setInterval(updateUptimes, 1000);
     
-    // Force grid re-render every 5 seconds to catch timeouts (uptime clocks still tick every 1s)
-    setInterval(renderGrid, 5000);
+    // NOTE: no 5s re-render interval — the RTDB listener below already fires
+    // on every status change, and uptime clocks tick via updateUptimes.
 }
 
 function listenToStatus() {
@@ -304,55 +305,126 @@ function listenToStatus() {
     });
 }
 
-function renderGrid() {
+// ---- Command Center: build-once, diff-update grid ----
+// Full innerHTML rebuilds (30 cards + lucide re-scan) on every RTDB event
+// made the page heavy. Cards are built once per branch/studio-count, then
+// only fields whose values changed are touched.
+let builtGridSignature = null;
+let gridCards = []; // [{ studio, card, badge, status, brand, host, sched, clock, last }]
+
+function buildGrid() {
     const branch = ccBranch.value;
     const branchConfig = getBranch(branch);
     const numStudios = branchConfig ? branchConfig.studioCount : 10;
-    
+    const suffix = branchConfig ? branchConfig.suffix : '';
+
     ccGrid.innerHTML = '';
-    
+    gridCards = [];
+
     for (let i = 1; i <= numStudios; i++) {
-        const suffix = branchConfig ? branchConfig.suffix : '';
-        const studioName = `Studio ${i} ${suffix}`;
-        const statusData = currentStatuses[studioName] || { status: 'idle' };
-        let isActive = statusData.status === 'active';
-        
-        // Native onDisconnect handles ghost timeouts instantly on the server.
-        // No local timeout checking needed here anymore!
-
-
-        
         const cardCol = document.createElement('div');
         cardCol.className = 'col-xl-2 col-lg-3 col-md-4 col-sm-6';
-        
         cardCol.innerHTML = `
-            <div class="card h-100 ${isActive ? 'border-info' : 'border-secondary'}" style="${isActive ? 'box-shadow: 0 0 20px rgba(13, 202, 240, 0.15); border-width: 2px !important;' : ''}">
+            <div class="card h-100 border-secondary">
                 <div class="card-body p-3 d-flex flex-column gap-2">
                     <div class="d-flex justify-content-between align-items-start">
-                        <span class="badge ${isActive ? 'bg-info text-dark' : 'bg-secondary text-white'}">${String(i).padStart(2, '0')} ${isActive && statusData.org ? statusData.org : ''}</span>
-                        <span class="small font-monospace fw-bold ${isActive ? 'text-info' : 'text-secondary'}">${isActive ? 'ACTIVE' : 'IDLE'}</span>
+                        <span class="badge bg-secondary text-white"></span>
+                        <span class="small font-monospace fw-bold text-secondary">IDLE</span>
                     </div>
                     <div class="mt-3">
-                        <h6 class="mb-0 text-white fw-bold brand-font" style="letter-spacing: 1px;">${isActive ? (statusData.brand || '-') : '-'}</h6>
-                        <small class="text-secondary">${isActive ? (statusData.host || '-') : '-'}</small>
-                        <small class="text-info mt-1 d-block" style="font-size: 0.75rem;">
-                            ${isActive && statusData.scheduleTime ? '<i data-lucide="clock" style="width: 12px; height: 12px;"></i> ' + statusData.scheduleTime : ''}
-                        </small>
+                        <h6 class="mb-0 text-white fw-bold brand-font" style="letter-spacing: 1px;">-</h6>
+                        <small class="text-secondary">-</small>
+                        <small class="text-info mt-1 d-block cc-sched" style="font-size: 0.75rem;"></small>
                     </div>
                     <div class="mt-auto pt-3 d-flex justify-content-end align-items-center border-top border-secondary mt-3">
-                        <small class="text-info font-monospace fw-bold uptime-clock" data-time="${isActive ? statusData.updatedAt : ''}">
-                            ${isActive ? '00:00:00' : '--:--'}
-                        </small>
+                        <small class="text-info font-monospace fw-bold uptime-clock" data-time="">--:--</small>
                     </div>
                 </div>
             </div>
         `;
         ccGrid.appendChild(cardCol);
+
+        gridCards.push({
+            studio: `Studio ${i} ${suffix}`,
+            num:    String(i).padStart(2, '0'),
+            card:   cardCol.querySelector('.card'),
+            badge:  cardCol.querySelector('.badge'),
+            status: cardCol.querySelector('.small.font-monospace'),
+            brand:  cardCol.querySelector('.brand-font'),
+            host:   cardCol.querySelector('.mt-3 > small.text-secondary'),
+            sched:  cardCol.querySelector('.cc-sched'),
+            clock:  cardCol.querySelector('.uptime-clock'),
+            last: {}
+        });
     }
-    
+
     if (window.lucide) {
         try { lucide.createIcons({ root: ccGrid }); } catch(e) { console.warn(e); }
     }
+    builtGridSignature = `${branch}|${gridCards.length}`;
+}
+
+function renderGrid() {
+    const branch = ccBranch.value;
+    const branchConfig = getBranch(branch);
+    const numStudios = branchConfig ? branchConfig.studioCount : 10;
+
+    // Rebuild only when branch or studio count changes
+    const signature = `${branch}|${numStudios}`;
+    if (signature !== builtGridSignature) {
+        buildGrid();
+    }
+
+    for (const entry of gridCards) {
+        const statusData = currentStatuses[entry.studio] || { status: 'idle' };
+        const isActive = statusData.status === 'active';
+
+        const studioNum = entry.num;
+        const next = {
+            isActive,
+            badgeText:  `${studioNum} ${isActive && statusData.org ? statusData.org : ''}`.trim(),
+            statusText: isActive ? 'ACTIVE' : 'IDLE',
+            brand:      isActive ? (statusData.brand || '-') : '-',
+            host:       isActive ? (statusData.host || '-') : '-',
+            sched:      isActive && statusData.scheduleTime ? statusData.scheduleTime : '',
+            time:       isActive ? String(statusData.updatedAt || '') : '',
+        };
+
+        const last = entry.last;
+        const changed = (k) => last[k] !== next[k];
+
+        if (changed('isActive')) {
+            last.isActive = next.isActive;
+            entry.card.className = `card h-100 ${next.isActive ? 'border-info' : 'border-secondary'}`;
+            entry.card.style.cssText = next.isActive
+                ? 'box-shadow: 0 0 20px rgba(13, 202, 240, 0.15); border-width: 2px !important;'
+                : '';
+            entry.badge.className = `badge ${next.isActive ? 'bg-info text-dark' : 'bg-secondary text-white'}`;
+            entry.status.className = `small font-monospace fw-bold ${next.isActive ? 'text-info' : 'text-secondary'}`;
+        }
+        if (changed('badgeText'))  { last.badgeText  = next.badgeText;  entry.badge.textContent = next.badgeText; }
+        if (changed('statusText')) { last.statusText = next.statusText; entry.status.textContent = next.statusText; }
+        if (changed('brand'))      { last.brand      = next.brand;      entry.brand.textContent = next.brand; }
+        if (changed('host'))       { last.host       = next.host;       entry.host.textContent = next.host; }
+        if (changed('sched')) {
+            last.sched = next.sched;
+            entry.sched.innerHTML = next.sched
+                ? '<i data-lucide="clock" style="width: 12px; height: 12px;"></i> '
+                : '';
+            if (next.sched) {
+                entry.sched.append(next.sched);
+                if (window.lucide) {
+                    try { lucide.createIcons({ root: entry.sched }); } catch(e) { console.warn(e); }
+                }
+            }
+        }
+        if (changed('time')) {
+            last.time = next.time;
+            entry.clock.setAttribute('data-time', next.time);
+            if (!next.time) entry.clock.textContent = '--:--'; // active → idle: clear stale uptime
+        }
+    }
+
     updateUptimes();
 }
 

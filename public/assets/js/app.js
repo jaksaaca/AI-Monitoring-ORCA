@@ -12,7 +12,7 @@ import * as FaceDetector from './modules/face-detector.js';
 import * as GazeClassifier from './modules/gaze-classifier.js';
 import * as VAD from './modules/vad.js';
 import * as Session from './modules/session.js';
-import { drawOverlay } from './modules/canvas-overlay.js';
+import { drawOverlay } from './modules/canvas-overlay.js?v=2';
 import { workerRequestAnimationFrame, workerCancelAnimationFrame, workerSetInterval, workerClearInterval } from './modules/worker-timer.js';
 import { getSchedule, subscribeToStudioStatus, saveSessionLog, setStudioStatus, listenToGlobalCommands, listenToScheduleSignal } from './modules/firebase-db.js';
 import { BRANCHES } from './modules/config.js';
@@ -93,6 +93,16 @@ let currentPoseClass = 'Depan';
 let currentFaceDetected = false;
 let backupInterval = null;
 
+// Render loop control (paused while tab is hidden to keep CPU/GPU cool)
+let renderLoopId     = null;
+let renderGen        = 0; // generation token — kills stale callbacks after stop/start
+let hiddenAiInterval = null;
+
+// VAD meter DOM cache — avoid getElementById + class churn every frame
+const meterBarEl = document.getElementById('vad-meter-bar');
+let lastMeterPct = -1;
+let lastMeterSpeaking = null;
+
 // Frame skipping — process AI every N frames for performance
 const AI_FRAME_SKIP = 10; // LITE OPTIMIZATION: Process 1 in every 10 frames // default balanced
 const currentVideoWidth = 1280;
@@ -151,19 +161,17 @@ async function initialize() {
             }
         }
 
-        setLoadingProgress(5, 'Initializing ONNX Runtime...');
+        setLoadingProgress(5, 'Initializing AI models...');
 
-        // Step 1: Initialize ONNX Runtime (Gaze Classifier)
-        setLoadingProgress(15, 'Loading gaze classification model...');
-        await GazeClassifier.init('assets/models/gaze_model.onnx', (msg) => {
-            setLoadingProgress(35, msg);
-        });
-
-        // Step 2: Initialize MediaPipe Face Detector
-        setLoadingProgress(45, 'Loading face detection model...');
-        await FaceDetector.init((msg) => {
-            setLoadingProgress(65, msg);
-        });
+        // Step 1+2 (parallel): ONNX Gaze model + MediaPipe FaceLandmarker load concurrently
+        await Promise.all([
+            GazeClassifier.init('assets/models/gaze_model.onnx', (msg) => {
+                setLoadingProgress(35, msg);
+            }),
+            FaceDetector.init((msg) => {
+                setLoadingProgress(65, msg);
+            }),
+        ]);
 
         // Step 3: Request camera access
         setLoadingProgress(75, 'Requesting camera access...');
@@ -240,8 +248,12 @@ async function initialize() {
         systemStatusText.textContent = 'System Ready';
         systemDot.classList.remove('recording');
 
-        // Start render loop
-        workerRequestAnimationFrame(renderLoop);
+        // Start render loop (or AI-only mode if tab opened in background)
+        if (document.hidden) {
+            startHiddenAi();
+        } else {
+            startRenderLoop();
+        }
 
     } catch (err) {
         console.error('[INIT] Fatal error:', err);
@@ -271,8 +283,8 @@ async function startCamera(deviceId = null) {
     // so portrait OBS Virtual Cameras (9:16) won't be padded with black bars internally.
     const constraints = {
         video: deviceId
-            ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1920 } }
-            : { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1920 } },
+            ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 1280 } }
+            : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 1280 } },
         audio: false
     };
 
@@ -337,8 +349,63 @@ async function populateDevices() {
 // ============================================
 // MAIN RENDER LOOP
 // ============================================
-function renderLoop(timestamp) {
-    workerRequestAnimationFrame(renderLoop);
+function startRenderLoop() {
+    if (renderLoopId !== null) return;
+    const gen = ++renderGen;
+    renderLoopId = workerRequestAnimationFrame((ts) => renderLoop(ts, gen));
+}
+
+function stopRenderLoop() {
+    renderGen++; // invalidate any in-flight callback
+    if (renderLoopId !== null) {
+        workerCancelAnimationFrame(renderLoopId);
+        renderLoopId = null;
+    }
+}
+
+// Tab hidden: canvas/DOM work is invisible anyway — stop it completely.
+// AI keeps sampling at 1 Hz so session stats stay accurate.
+// Session 1 Hz tick, 5s backup and heartbeat intervals are unaffected.
+function startHiddenAi() {
+    if (hiddenAiInterval) return;
+    hiddenAiInterval = workerSetInterval(async () => {
+        if (videoEl.readyState < 2) return;
+        await processAI(performance.now());
+        Session.updateState(currentFaceDetected, currentPoseClass, VAD.isSpeaking());
+    }, 1000);
+}
+
+function stopHiddenAi() {
+    if (hiddenAiInterval) {
+        workerClearInterval(hiddenAiInterval);
+        hiddenAiInterval = null;
+    }
+}
+
+function handleVisibilityChange() {
+    if (document.hidden) {
+        stopRenderLoop();
+        startHiddenAi();
+    } else {
+        stopHiddenAi();
+        videoEl.play().catch(() => {});
+        // Reset FPS window so the badge doesn't show a bogus value after the gap
+        fpsFrameCount = 0;
+        fpsLastTime = performance.now();
+        startRenderLoop();
+    }
+}
+
+document.addEventListener('visibilitychange', handleVisibilityChange);
+
+function renderLoop(timestamp, gen) {
+    // Stale callback from before a stop/start cycle — exit quietly
+    if (gen !== renderGen) return;
+    if (document.hidden) {
+        renderLoopId = null;
+        return;
+    }
+    renderLoopId = workerRequestAnimationFrame((ts) => renderLoop(ts, gen));
 
     // Don't process if video isn't playing
     if (videoEl.readyState < 2) return;
@@ -390,24 +457,27 @@ function renderLoop(timestamp) {
 }
 
 function updateVadMeter() {
-    const meterBar = document.getElementById('vad-meter-bar');
-    if (!meterBar) return;
-    
+    if (!meterBarEl) return;
+
     const rms = VAD.getRms();
     const threshold = VAD.getThreshold();
-    
-    // Scale RMS for visual bar (0.15 RMS = 100% width)
+
+    // Scale RMS for visual bar (0.15 RMS = 100% width), quantized to 1%
     let pct = (rms / 0.15) * 100;
     if (pct > 100) pct = 100;
-    
-    meterBar.style.width = pct + '%';
-    
-    if (rms > threshold) {
-        meterBar.classList.remove('bg-secondary');
-        meterBar.classList.add('bg-success');
-    } else {
-        meterBar.classList.remove('bg-success');
-        meterBar.classList.add('bg-secondary');
+    const q = Math.round(pct);
+
+    // Only touch the DOM when the value actually changed
+    if (q !== lastMeterPct) {
+        lastMeterPct = q;
+        meterBarEl.style.width = q + '%';
+    }
+
+    const speaking = rms > threshold;
+    if (speaking !== lastMeterSpeaking) {
+        lastMeterSpeaking = speaking;
+        meterBarEl.classList.toggle('bg-success', speaking);
+        meterBarEl.classList.toggle('bg-secondary', !speaking);
     }
 }
 
@@ -466,40 +536,55 @@ async function processAI(timestamp) {
 // ============================================
 // UI UPDATE FUNCTIONS
 // ============================================
+// Diff-render cache: only write to the DOM when a value actually changed.
+// Rebuilding innerHTML/className every frame forced a style recalc at 30 FPS.
+const badgeCache = { face: null, pose: undefined, speak: null, dur: null, speaking: null, facing: null, headdown: null, notfacing: null, offframe: null };
+
 function updateBadges() {
     // Face badge
-    if (currentFaceDetected) {
+    if (currentFaceDetected !== badgeCache.face) {
+        badgeCache.face = currentFaceDetected;
         badgeFace.innerHTML = '<span class="dot-ready bg-white"></span> Face';
-        badgeFace.className = 'badge bg-success d-flex align-items-center gap-2 border border-light-subtle opacity-75';
-    } else {
-        badgeFace.innerHTML = '<span class="dot-ready bg-white"></span> Face';
-        badgeFace.className = 'badge bg-danger d-flex align-items-center gap-2 border border-light-subtle opacity-75';
+        badgeFace.className = currentFaceDetected
+            ? 'badge bg-success d-flex align-items-center gap-2 border border-light-subtle opacity-75'
+            : 'badge bg-danger d-flex align-items-center gap-2 border border-light-subtle opacity-75';
     }
 
     // Pose badge
-    badgePose.innerHTML = `<span class="dot-ready bg-white"></span> Pose: ${currentPoseClass}`;
-    badgePose.className = currentFaceDetected 
-        ? 'badge bg-success d-flex align-items-center gap-2 border border-light-subtle opacity-75' 
-        : 'badge bg-white d-flex align-items-center gap-2 border border-light-subtle opacity-75';
-
-    // Speech badge
-    if (VAD.isSpeaking()) {
-        badgeSpeak.innerHTML = '<span class="dot-ready bg-white"></span> Voice';
-        badgeSpeak.className = 'badge bg-success d-flex align-items-center gap-2 border border-light-subtle opacity-75';
-    } else {
-        badgeSpeak.innerHTML = '<span class="dot-ready bg-white"></span> Voice';
-        badgeSpeak.className = 'badge bg-white d-flex align-items-center gap-2 border border-light-subtle opacity-75';
+    const poseKey = currentFaceDetected ? currentPoseClass : null;
+    if (poseKey !== badgeCache.pose) {
+        badgeCache.pose = poseKey;
+        badgePose.innerHTML = `<span class="dot-ready bg-white"></span> Pose: ${currentPoseClass}`;
+        badgePose.className = currentFaceDetected
+            ? 'badge bg-success d-flex align-items-center gap-2 border border-light-subtle opacity-75'
+            : 'badge bg-white d-flex align-items-center gap-2 border border-light-subtle opacity-75';
     }
 
-    // Session stats (update every loop frame for smooth display)
+    // Speech badge
+    const speaking = VAD.isSpeaking();
+    if (speaking !== badgeCache.speak) {
+        badgeCache.speak = speaking;
+        badgeSpeak.innerHTML = '<span class="dot-ready bg-white"></span> Voice';
+        badgeSpeak.className = speaking
+            ? 'badge bg-success d-flex align-items-center gap-2 border border-light-subtle opacity-75'
+            : 'badge bg-white d-flex align-items-center gap-2 border border-light-subtle opacity-75';
+    }
+
+    // Session stats (values change at most 1 Hz — diff, don't rewrite)
     if (isSessionActive) {
         const stats = Session.getStats();
-        statDuration.textContent = formatDuration(stats.total_duration_seconds);
-        statSpeaking.textContent = formatDuration(stats.speaking_seconds);
-        statFacing.textContent = formatDuration(stats.facing_camera_seconds);
-        statHeadDown.textContent = formatDuration(stats.head_down_seconds);
-        statNotFacing.textContent = formatDuration(stats.not_facing_seconds);
-        statOffFrame.textContent = formatDuration(stats.off_frame_seconds);
+        const setText = (el, key, val) => {
+            if (val !== badgeCache[key]) {
+                badgeCache[key] = val;
+                el.textContent = val;
+            }
+        };
+        setText(statDuration,  'dur',       formatDuration(stats.total_duration_seconds));
+        setText(statSpeaking,  'speaking',  formatDuration(stats.speaking_seconds));
+        setText(statFacing,    'facing',    formatDuration(stats.facing_camera_seconds));
+        setText(statHeadDown,  'headdown',  formatDuration(stats.head_down_seconds));
+        setText(statNotFacing, 'notfacing', formatDuration(stats.not_facing_seconds));
+        setText(statOffFrame,  'offframe',  formatDuration(stats.off_frame_seconds));
     }
 }
 
@@ -897,7 +982,9 @@ btnStop.addEventListener('click', async () => {
     systemDot.classList.remove('recording');
     systemStatusText.textContent = 'System Ready';
 
-    // Reset stat display
+    // Reset stat display (and diff cache, so the next session writes fresh values)
+    badgeCache.dur = badgeCache.speaking = badgeCache.facing = null;
+    badgeCache.headdown = badgeCache.notfacing = badgeCache.offframe = null;
     statDuration.textContent = '0s';
     statSpeaking.textContent = '0s';
     statFacing.textContent = '0s';
